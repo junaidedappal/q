@@ -59,10 +59,7 @@ $payouts = [];
 $companyTotal = 0;
 
 while ($row = $result->fetch_assoc()) {
-    // Mentor's earnings from sessions and exams
     $mentorOwnEarnings = ($row['total_sessions'] * $row['rate_per_session']) + ($row['total_exams'] * $row['rate_per_exam']);
-    
-    // Combined Teacher Payout: (Regular Classes) + (Independent Demos at Grade Rate)
     $combinedTeacherPayout = floatval($row['total_session_teacher_payout'] ?? 0) + floatval($row['total_demo_teacher_payout'] ?? 0);
     
     $row['mentor_earnings'] = $mentorOwnEarnings;
@@ -86,7 +83,6 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); 
 
-    // FIXED: Added ",", "\"", "\\" parameters to all fputcsv calls
     fputcsv($output, ['Mentor Name', 'Phone', 'Sessions', 'Exams', 'Teachers Payout (Inc. Demos)', 'Mentor Fee', 'Grand Total'], ",", "\"", "\\");
 
     foreach ($payouts as $p) {
@@ -102,7 +98,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
     }
 
     if ($userRole === 'admin') {
-        fputcsv($output, [], ",", "\"", "\\"); // Empty line
+        fputcsv($output, [], ",", "\"", "\\");
         fputcsv($output, ['TOTAL COMPANY OUTFLOW', '', '', '', '', '', number_format($companyTotal, 2, '.', '')], ",", "\"", "\\");
     }
     
@@ -120,103 +116,192 @@ body {
 .quidei-header {
     background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
     color: white;
-    border-radius: 15px;
-    padding: 2rem;
+    border-radius: 16px;
+    padding: 1.25rem;
+}
+
+@media (min-width: 768px) {
+    .quidei-header {
+        padding: 2rem;
+    }
 }
 
 .card-payout {
     border: none;
-    border-radius: 15px;
-    transition: 0.2s;
+    border-radius: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-payout:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
 .text-lump-sum {
-    color: #10b981;
+    color: #059669;
     font-weight: 800;
 }
 
+.currency-box {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 2px;
+    white-space: nowrap;
+    word-break: normal;
+}
+
+.currency-sym {
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.payout-stat-card {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 0.75rem 0.5rem;
+    height: 100%;
+}
+
 .btn-export {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: white;
+}
+
+.btn-export:hover {
+    background: rgba(255, 255, 255, 0.2);
     color: white;
 }
 </style>
 
-<div class="container-fluid py-4">
+<div class="container-fluid px-3 px-sm-4 py-3 py-sm-4">
     <!-- Header -->
-    <div class="quidei-header mb-4 shadow">
+    <div class="quidei-header mb-3 mb-md-4 shadow-sm">
         <div class="row gy-3 align-items-center">
-            <div class="col-lg-6">
-                <h2 class="fw-bold mb-1"><i class="bi bi-shield-check me-2"></i>QUIDIE PAYOUTS</h2>
-                <p class="mb-0 opacity-75 small">Consolidated Mentor & Teacher Distribution (Including Independent
-                    Demos)</p>
+            <div class="col-12 col-md-6 text-center text-md-start">
+                <h3 class="fw-bold mb-1 fs-4 fs-md-3">
+                    <i class="bi bi-shield-check me-2"></i>QUIDIE PAYOUTS
+                </h3>
+                <p class="mb-0 opacity-75 small">Consolidated Mentor & Teacher Distribution</p>
             </div>
-            <div class="col-lg-6 text-lg-end">
-                <a href="?month=<?php echo $selectedMonth; ?>&year=<?php echo $selectedYear; ?>&export=csv"
-                    class="btn btn-sm btn-export rounded-pill px-3">
-                    <i class="bi bi-file-earmark-excel"></i> Export Excel
-                </a>
-                <form class="d-inline-flex gap-2 bg-white p-1 rounded-pill ms-2 shadow-sm">
-                    <select name="month"
-                        class="form-select form-select-sm border-0 bg-transparent"><?php for($m=1;$m<=12;$m++) echo "<option value='".str_pad($m,2,'0',STR_PAD_LEFT)."' ".($m==$selectedMonth?'selected':'').">".date('M', mktime(0,0,0,$m,10))."</option>"; ?></select>
-                    <select name="year"
-                        class="form-select form-select-sm border-0 bg-transparent"><?php for($y=2024;$y<=date('Y');$y++) echo "<option value='$y' ".($y==$selectedYear?'selected':'').">$y</option>"; ?></select>
-                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Go</button>
-                </form>
+
+            <div class="col-12 col-md-6">
+                <div
+                    class="d-flex flex-column flex-sm-row gap-2 justify-content-md-end align-items-stretch align-items-sm-center">
+                    <a href="?month=<?php echo $selectedMonth; ?>&year=<?php echo $selectedYear; ?>&export=csv"
+                        class="btn btn-sm btn-export rounded-pill px-3 py-2 text-center">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
+                    </a>
+
+                    <form class="d-flex align-items-center gap-1 bg-white p-1 rounded-pill shadow-sm">
+                        <select name="month" class="form-select form-select-sm border-0 bg-transparent ps-3 pe-4"
+                            style="width: auto; min-width: 90px; cursor: pointer;">
+                            <?php for($m=1; $m<=12; $m++): ?>
+                            <option value="<?php echo str_pad($m, 2, '0', STR_PAD_LEFT); ?>"
+                                <?php echo ($m == $selectedMonth ? 'selected' : ''); ?>>
+                                <?php echo date('M', mktime(0, 0, 0, $m, 10)); ?>
+                            </option>
+                            <?php endfor; ?>
+                        </select>
+
+                        <select name="year" class="form-select form-select-sm border-0 bg-transparent ps-2 pe-4"
+                            style="width: auto; min-width: 85px; cursor: pointer;">
+                            <?php for($y=2024; $y<=date('Y'); $y++): ?>
+                            <option value="<?php echo $y; ?>" <?php echo ($y == $selectedYear ? 'selected' : ''); ?>>
+                                <?php echo $y; ?>
+                            </option>
+                            <?php endfor; ?>
+                        </select>
+
+                        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Go</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Summary -->
+    <!-- Admin Company Total -->
     <?php if($userRole === 'admin'): ?>
-    <div class="alert bg-white border-0 shadow-sm rounded-3 d-flex justify-content-between align-items-center p-3 mb-4">
-        <span class="fw-bold text-muted small text-uppercase">Total Monthly Company Outflow</span>
-        <span class="h4 fw-bold text-primary mb-0">₹<?php echo number_format($companyTotal, 2); ?></span>
+    <div class="card border-0 shadow-sm rounded-3 mb-3 mb-md-4">
+        <div
+            class="card-body p-3 d-flex flex-column flex-sm-row justify-content-between align-items-center text-center text-sm-start gap-2">
+            <span class="fw-semibold text-muted small text-uppercase tracking-wide">Total Monthly Outflow</span>
+            <div class="currency-box text-primary fs-4 fw-bold">
+                <span class="currency-sym">₹</span><?php echo number_format($companyTotal, 2); ?>
+            </div>
+        </div>
     </div>
     <?php endif; ?>
 
-    <!-- Mentor Cards -->
+    <!-- Mentor Cards Grid -->
     <div class="row g-3">
         <?php if(empty($payouts)): ?>
-        <div class="col-12 text-center py-5 text-muted">No payout activity found for
-            <?php echo "$monthName $selectedYear"; ?>.</div>
+        <div class="col-12 text-center py-5 bg-white rounded-3 shadow-sm text-muted">
+            <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+            No payout activity found for <?php echo "$monthName $selectedYear"; ?>.
+        </div>
         <?php else: ?>
         <?php foreach($payouts as $p): ?>
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-xl-6">
             <div class="card card-payout shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-2">
+                <div class="card-body p-3 p-sm-4">
+
+                    <!-- Mentor Info & Link -->
+                    <div
+                        class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3 pb-3 border-bottom">
                         <div>
-                            <h5 class="fw-bold mb-0 text-dark"><?php echo $p['mentor_name']; ?></h5>
-                            <small class="text-muted"><i
-                                    class="bi bi-telephone me-1"></i><?php echo $p['mentor_phone']; ?></small>
+                            <h5 class="fw-bold mb-0 text-dark"><?php echo htmlspecialchars($p['mentor_name']); ?></h5>
+                            <!-- <small class="text-muted d-inline-block mt-1">
+                                <i class="bi bi-telephone me-1"></i><?php echo htmlspecialchars($p['mentor_phone']); ?>
+                            </small> -->
                         </div>
                         <a href="quidei_payout_detail.php?mentor_id=<?php echo $p['mentor_id']; ?>&month=<?php echo $selectedMonth; ?>&year=<?php echo $selectedYear; ?>"
-                            class="btn btn-sm btn-outline-dark rounded-pill px-3">View Detailed Breakdown</a>
+                            class="btn btn-sm btn-outline-dark rounded-pill px-3  w-sm-auto text-center">
+                            Detailed Breakdown <i class="bi bi-chevron-right ms-1 small"></i>
+                        </a>
                     </div>
 
-                    <div class="row text-center gy-2">
-                        <div class="col-4 border-end">
-                            <div class="small text-muted fw-bold mb-1" style="font-size: 0.6rem;">TEACHERS TOTAL</div>
-                            <div class="fw-bold text-dark">₹<?php echo number_format($p['total_teacher_payout'], 2); ?>
+                    <!-- Numeric Stats -->
+                    <div class="row g-2 text-center">
+                        <div class="col-12 col-sm-4">
+                            <div class="payout-stat-card">
+                                <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem;">Teachers
+                                    Total</div>
+                                <div class="currency-box text-dark fw-bold fs-6 mt-1">
+                                    <span
+                                        class="currency-sym">₹</span><?php echo number_format($p['total_teacher_payout'], 2); ?>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.65rem;">(Sessions + Demos)</div>
                             </div>
-                            <div class="text-muted" style="font-size: 0.55rem;">(Inc. Sessions & Demos)</div>
                         </div>
-                        <div class="col-4 border-end">
-                            <div class="small text-muted fw-bold mb-1" style="font-size: 0.6rem;">MENTOR FEE</div>
-                            <div class="fw-bold text-dark">₹<?php echo number_format($p['mentor_earnings'], 2); ?></div>
-                            <div class="text-muted" style="font-size: 0.55rem;">(Sessions & Exams)</div>
+
+                        <div class="col-6 col-sm-4">
+                            <div class="payout-stat-card">
+                                <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem;">Mentor Fee
+                                </div>
+                                <div class="currency-box text-dark fw-bold fs-6 mt-1">
+                                    <span
+                                        class="currency-sym">₹</span><?php echo number_format($p['mentor_earnings'], 2); ?>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.65rem;">(Sessions & Exams)</div>
+                            </div>
                         </div>
-                        <div class="col-4">
-                            <div class="small text-muted fw-bold mb-1" style="font-size: 0.6rem;">GRAND TOTAL</div>
-                            <div class="text-lump-sum h5 mb-0">₹<?php echo number_format($p['grand_lump_sum'], 2); ?>
+
+                        <div class="col-6 col-sm-4">
+                            <div class="payout-stat-card bg-emerald-subtle">
+                                <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem;">Grand Total
+                                </div>
+                                <div class="currency-box text-lump-sum fs-6 mt-1">
+                                    <span
+                                        class="currency-sym">₹</span><?php echo number_format($p['grand_lump_sum'], 2); ?>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.65rem;">(Total Distribution)</div>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
