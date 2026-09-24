@@ -276,6 +276,8 @@ body {
         </div>
     </div>
 </div>
+
+
 <!-- Approve Admission Modal -->
 <div class="modal fade" id="approveAdmissionModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
@@ -428,6 +430,11 @@ $(document).ready(function() {
     // This reusable function fetches teachers for a subject and populates a dropdown
     function updateTeacherOptions(selectElementId, subjectId, selectedTeacherId = null) {
         const select = $(selectElementId);
+
+        if (select.hasClass('select2-hidden-accessible')) {
+            select.select2('destroy');
+        }
+
         select.empty().append(new Option('Loading teachers...', ''));
         $.get('demo_action.php', {
             action: 'get_teachers',
@@ -435,13 +442,27 @@ $(document).ready(function() {
         }, function(response) {
             select.empty().append(new Option('Select a Teacher', ''));
             if (response.status === 'success' && response.teachers.length > 0) {
-                response.teachers.forEach(function(teacher) {
+                response.teachers.sort(function(firstTeacher, secondTeacher) {
+                    return firstTeacher.display_name.localeCompare(
+                        secondTeacher.display_name,
+                        undefined,
+                        { sensitivity: 'base', numeric: true }
+                    );
+                }).forEach(function(teacher) {
                     select.append(new Option(teacher.display_name, teacher.id));
                 });
                 if (selectedTeacherId) select.val(selectedTeacherId);
             } else {
                 select.empty().append(new Option('No teachers available for this subject', ''));
             }
+
+            select.select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Select a Teacher',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: select.closest('.modal')
+            });
         }, 'json');
     }
 
