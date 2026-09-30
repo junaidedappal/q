@@ -366,6 +366,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // --- HANDLE POST REQUESTS ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+    $can_edit_teacher_payout = $_SESSION['role'] === 'admin';
+    if (!$can_edit_teacher_payout) {
+        $permission_stmt = $conn->prepare('SELECT can_edit_teacher_payout FROM users WHERE id = ?');
+        $permission_stmt->bind_param('i', $_SESSION['id']);
+        $permission_stmt->execute();
+        $can_edit_teacher_payout = (bool) ($permission_stmt->get_result()->fetch_assoc()['can_edit_teacher_payout'] ?? false);
+    }
     if ($_SESSION['role'] === 'supervisor') {
         echo json_encode(['status' => 'error', 'message' => 'Permission Denied: Supervisors have view-only access.']);
         exit;
@@ -526,6 +533,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $teacher_id = intval($_POST['teacher_id']);
             $planned_hours = floatval($_POST['planned_hours']);
             $teacher_pay = !empty($_POST['teacher_pay']) ? floatval($_POST['teacher_pay']) : 0;
+            if (!$can_edit_teacher_payout) {
+                $teacher_pay = 0;
+            }
 
             // 1. Fetch Schedule Info, Dates, and Student Schedule Count in one go
             $sch_query = $conn->prepare('
@@ -686,6 +696,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : '';
             $remarks = $notes;  // Used for attendance 'reason' column
             $teacher_pay = !empty($_POST['teacher_pay']) ? floatval($_POST['teacher_pay']) : 0;
+
+            if (!$can_edit_teacher_payout) {
+                $pay_stmt = $conn->prepare('SELECT teacher_pay FROM sessions WHERE id = ?');
+                $pay_stmt->bind_param('i', $session_id);
+                $pay_stmt->execute();
+                $teacher_pay = floatval($pay_stmt->get_result()->fetch_assoc()['teacher_pay'] ?? 0);
+            }
 
             // 1. Absence Validation
             if ($status_attendance == '0' && empty($remarks)) {

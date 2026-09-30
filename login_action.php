@@ -1,4 +1,13 @@
 <?php
+$session_lifetime = 30 * 24 * 60 * 60;
+ini_set('session.gc_maxlifetime', (string) $session_lifetime);
+session_set_cookie_params([
+    'lifetime' => $session_lifetime,
+    'path' => '/',
+    'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
 require 'includes/db.php';
 

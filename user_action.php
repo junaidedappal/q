@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     switch ($action) {
         case 'get_user_details':
             $user_id = intval($_GET['user_id']);
-            $stmt = $conn->prepare("SELECT id, name, email, phone, role, status FROM users WHERE id = ?");
+            $stmt = $conn->prepare("SELECT id, name, email, phone, role, status, can_edit_teacher_payout FROM users WHERE id = ?");
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
             $data = $stmt->get_result()->fetch_assoc();
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             break;
 
         default: // Get list for DataTable
-            $sql = "SELECT id, name, email, role, status FROM users ORDER BY id DESC";
+            $sql = "SELECT id, name, email, role, status, can_edit_teacher_payout FROM users ORDER BY id DESC";
             $result = $conn->query($sql);
             $data = [];
             while ($row = $result->fetch_assoc()) {
@@ -92,13 +92,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 $status_class = ($row['status'] === 'active') ? 'bg-success' : 'bg-secondary';
                 $row['status_badge'] = '<span class="badge ' . $status_class . '">' . htmlspecialchars(ucfirst($row['status'])) . '</span>';
                 
-                // --- MODIFICATION START: Use d-flex and gap for button spacing ---
-                $row['actions'] = '<div class="d-flex gap-1">
+                $payoutToggle = '<div class="form-check form-switch d-flex justify-content-center mb-0">
+                                    <input class="form-check-input payout-permission-toggle" type="checkbox" data-id="' . $row['id'] . '"' . ($row['can_edit_teacher_payout'] ? ' checked' : '') . ' aria-label="Allow teacher payout editing">
+                                </div>';
+
+                $row['payout_permission'] = $payoutToggle;
+                $row['actions'] = '<div class="d-flex flex-wrap gap-1">
                                     <button class="btn btn-sm btn-purple btn-view" data-id="'.$row['id'].'" title="View"><i class="bi bi-eye-fill"></i></button>
                                     <button class="btn btn-sm btn-info btn-edit" data-id="'.$row['id'].'" title="Edit"><i class="bi bi-pencil-square"></i></button>
                                     <button class="btn btn-sm btn-danger btn-delete" data-id="'.$row['id'].'" title="Delete"><i class="bi bi-trash3-fill"></i></button>
                                 </div>';
-                // --- MODIFICATION END ---
                 
                 $data[] = $row;
             }
@@ -111,6 +114,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ... (Your entire POST logic remains unchanged as it is already correct) ...
     $action = $_POST['action'] ?? '';
+
+    if ($action === 'toggle_teacher_payout_permission') {
+        $user_id = intval($_POST['user_id'] ?? 0);
+        $allowed = !empty($_POST['can_edit_teacher_payout']) ? 1 : 0;
+        $stmt = $conn->prepare("UPDATE users SET can_edit_teacher_payout = ? WHERE id = ?");
+        $stmt->bind_param("ii", $allowed, $user_id);
+
+        echo json_encode($stmt->execute()
+            ? ['status' => 'success', 'message' => 'Teacher payout permission updated.']
+            : ['status' => 'error', 'message' => 'Could not update teacher payout permission.']);
+        exit;
+    }
 
     // --- Helper Functions (These are correct) ---
     function manageTeacherProfile($conn, $user_id, $post_data) {

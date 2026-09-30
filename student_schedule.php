@@ -12,6 +12,13 @@ if (!isset($_SESSION['loggedin']) || !in_array($_SESSION['role'], ['admin', 'men
 
 // --- ADD THIS LINE HERE ---
 $userRole = $_SESSION['role'];
+$canEditTeacherPayout = $userRole === 'admin';
+if (!$canEditTeacherPayout) {
+    $permission_stmt = $conn->prepare('SELECT can_edit_teacher_payout FROM users WHERE id = ?');
+    $permission_stmt->bind_param('i', $_SESSION['id']);
+    $permission_stmt->execute();
+    $canEditTeacherPayout = (bool) ($permission_stmt->get_result()->fetch_assoc()['can_edit_teacher_payout'] ?? false);
+}
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die('<div class="container my-5"><div class="alert alert-danger">Error: Invalid student ID.</div></div>');
 }
@@ -248,14 +255,14 @@ body {
                         <!-- Total Hours (Visible to both Admin and Mentor) -->
                         <div class="col-md-6">
                             <label class="small fw-bold text-primary">Total Hours</label>
-                            <input type="number" name="total_hours" class="form-control" step="0.25" required>
+                            <input type="number" name="total_hours" class="form-control" step="0.05" required>
                         </div>
 
                         <!-- Paid Hours (RESTRICTED: Only Admin can see/set initial paid hours) -->
                         <?php if ($_SESSION['role'] === 'admin'): ?>
                         <div class="col-md-6">
                             <label class="small fw-bold text-success">Paid Hours</label>
-                            <input type="number" name="paid_hours" class="form-control" step="0.25" value="0">
+                            <input type="number" name="paid_hours" class="form-control" step="0.05" value="0">
                         </div>
                         <?php else: ?>
                         <!-- If Mentor: Default to 0 paid hours hiddenly -->
@@ -303,14 +310,14 @@ body {
                         <div class="col-md-6">
                             <label class="small fw-bold text-primary">Total Hours</label>
                             <input type="number" name="total_hours" id="edit_total_hours" class="form-control"
-                                step="0.25" required>
+                                step="0.05" required>
                         </div>
 
                         <!-- Paid Hours (Added step="0.25") -->
                         <?php if ($_SESSION['role'] === 'admin'): ?>
                         <div class="col-md-6">
                             <label class="small fw-bold text-success">Paid Hours</label>
-                            <input type="number" name="paid_hours" id="edit_paid_hours" class="form-control" step="0.25"
+                            <input type="number" name="paid_hours" id="edit_paid_hours" class="form-control" step="0.05"
                                 required>
                         </div>
                         <?php else: ?>
@@ -358,7 +365,7 @@ body {
                         <div class="col-6">
                             <div class="mb-3">
                                 <label class="small fw-bold">Duration (Hours)</label>
-                                <input type="number" name="planned_hours" class="form-control" step="0.25" min="0.5"
+                                <input type="number" name="planned_hours" class="form-control" step="0.05" min="0"
                                     max="5" value="1" required>
                             </div>
                         </div>
@@ -367,7 +374,7 @@ body {
                                 <label
                                     class="small fw-bold text-danger d-flex justify-content-between align-items-center">
                                     <span>Teacher Pay/Hour</span>
-                                    <?php if ($userRole === 'admin'): ?>
+                                    <?php if ($canEditTeacherPayout): ?>
 
                                     <div class="form-check form-switch mb-0">
                                         <input class="form-check-input cursor-pointer" type="checkbox"
@@ -436,14 +443,14 @@ body {
                                     class="text-danger">*</span></label>
                             <!-- Min is 0 to allow script to handle it, but validation will enforce >0 for Present -->
                             <input type="number" name="actual_hours" id="att_duration_hours" class="form-control"
-                                step="0.25" min="0">
-                            <div class="form-text small">e.g. 1.0, 1.25, 1.5</div>
+                                step="0.05" min="0">
+                            <div class="form-text small">e.g. 1.0, 1.5, 1.20</div>
                         </div>
 
                         <div class="mb-3">
                             <label class="small fw-bold d-flex justify-content-between align-items-center">
                                 <span>Teacher Payment Rate (Per Hour) ₹</span>
-                                <?php if ($userRole === 'admin'): ?>
+                                <?php if ($canEditTeacherPayout): ?>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input cursor-pointer" type="checkbox" id="lock_pay_att">
                                     <label class="form-check-label text-muted" style="font-size: 0.65rem;"
@@ -543,7 +550,7 @@ body {
                         </div>
                         <div class="col-6">
                             <label class="small fw-bold text-primary">Duration (Hours)</label>
-                            <input type="number" name="duration_hours" class="form-control" step="0.25" min="0.5"
+                            <input type="number" name="duration_hours" class="form-control" step="0.05" min="0"
                                 value="1" required>
                         </div>
                     </div>
@@ -585,7 +592,7 @@ body {
                         <div class="col-6">
                             <label class="small fw-bold">Duration (Hrs)</label>
                             <input type="number" name="duration_hours" id="edit_demo_duration" class="form-control"
-                                step="0.25" required>
+                                step="0.05" min="0" required>
                         </div>
                     </div>
                 </div>

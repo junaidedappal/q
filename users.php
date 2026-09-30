@@ -118,6 +118,18 @@ body {
 .remove-subject-btn:hover {
     opacity: 1;
 }
+
+@media (max-width: 768px) {
+    .card-header {
+        align-items: stretch !important;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .card-header>.d-flex {
+        flex-wrap: wrap;
+    }
+}
 </style>
 
 <!-- Stylish Page Header -->
@@ -130,49 +142,47 @@ body {
         </div>
     </div>
 </div>
-
-<!-- Main Content Card -->
 <div class="card glass-card">
     <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-3 px-4">
         <h5 class="card-title mb-0 text-dark">All System Users</h5>
 
-        <div class="d-flex align-items-center gap-2">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text bg-light border-0"><i class="bi bi-funnel-fill"></i></span>
-                <select id="roleFilter" class="form-select form-select-sm border-0">
-                    <option value="">All Roles</option>
-                    <option value="admin">Admin</option>
-                    <option value="sales">Sales</option>
-                    <option value="demoAdmin">Demo Admin</option>
-                    <option value="demoCordinator">Demo Cordinator</option>
-                    <option value="mentor">Mentor</option>
-                    <option value="hrmanager">HR MANAGER</option>
-                    <option value="accounts">Accounts</option>
-                    <option value="supervisor">Super Visor</option>
-                </select>
-            </div>
-            <button class="btn btn-primary btn-gradient shadow-sm flex-shrink-0" id="addUserBtn">
-                <i class="bi bi-person-plus-fill me-1"></i>Add New User
-            </button>
+        <div class="input-group input-group-sm">
+            <span class="input-group-text bg-light border-0"><i class="bi bi-funnel-fill"></i></span>
+            <select id="roleFilter" class="form-select form-select-sm border-0">
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="sales">Sales</option>
+                <option value="demoAdmin">Demo Admin</option>
+                <option value="demoCordinator">Demo Cordinator</option>
+                <option value="mentor">Mentor</option>
+                <option value="hrmanager">HR MANAGER</option>
+                <option value="accounts">Accounts</option>
+                <option value="supervisor">Super Visor</option>
+            </select>
         </div>
+        <button class="btn btn-primary btn-gradient shadow-sm flex-shrink-0" id="addUserBtn">
+            <i class="bi bi-person-plus-fill me-1"></i>Add New User
+        </button>
+    </div>
 
+</div>
+<div class="card-body">
+    <div class="table-responsive">
+        <table id="usersTable" class="table table-hover stylish-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th class="text-center">Payout Edit</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+        </table>
     </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table id="usersTable" class="table table-hover stylish-table" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-            </table>
-        </div>
-    </div>
+</div>
 </div>
 
 <!-- Add/Edit User Modal -->
@@ -304,25 +314,38 @@ $(document).ready(function() {
             "type": "GET" // Explicitly set GET for datatables
         },
         "columns": [{
-                "data": "id"
+                "data": "id",
+                "responsivePriority": 5
             },
             {
-                "data": "name"
+                "data": "name",
+                "responsivePriority": 1
             },
             {
-                "data": "email"
+                "data": "email",
+                "responsivePriority": 4
             },
             {
-                "data": "role"
+                "data": "role",
+                "responsivePriority": 3
             },
             {
-                "data": "status_badge"
+                "data": "status_badge",
+                "responsivePriority": 6
+            },
+            {
+                "data": "payout_permission",
+                "orderable": false,
+                "className": "text-center",
+                "responsivePriority": 2
             },
             {
                 "data": "actions",
-                "orderable": false
+                "orderable": false,
+                "responsivePriority": 1
             }
         ],
+        "responsive": true,
         "order": [
             [0, 'desc']
         ],
@@ -338,6 +361,25 @@ $(document).ready(function() {
     $('#roleFilter').on('change', function() {
         var selectedRole = $(this).val();
         table.column(3).search(selectedRole ? '^' + selectedRole + '$' : '', true, false).draw();
+    });
+
+    $('#usersTable tbody').on('change', '.payout-permission-toggle', function() {
+        const toggle = this;
+        const allowed = toggle.checked ? 1 : 0;
+
+        $.post('user_action.php', {
+            action: 'toggle_teacher_payout_permission',
+            user_id: $(toggle).data('id'),
+            can_edit_teacher_payout: allowed
+        }, function(response) {
+            if (response.status !== 'success') {
+                toggle.checked = !toggle.checked;
+                Swal.fire('Error', response.message, 'error');
+            }
+        }, 'json').fail(function() {
+            toggle.checked = !toggle.checked;
+            Swal.fire('Error', 'Could not update teacher payout permission.', 'error');
+        });
     });
 
     var allSubjects = <?php echo json_encode($subjects_result->fetch_all(MYSQLI_ASSOC)); ?>;

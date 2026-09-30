@@ -98,8 +98,31 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
 } 
 ?>
 
+<style>
+.payout-summary-total {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.15em;
+    white-space: nowrap;
+}
+
+.payout-summary-total .currency-symbol {
+    flex: 0 0 auto;
+}
+
+.payout-summary-total .amount {
+    min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+    .payout-summary-total {
+        font-size: 1.75rem;
+    }
+}
+</style>
+
 <!-- Header Summary -->
-<div class="card card-main bg-white p-4 mb-4">
+<div class="card card-main bg-white p-3 p-md-4 mb-4">
     <div class="row align-items-center">
         <!-- Added mobile bottom spacing and border adjustments -->
         <div class="col-md-7 border-md-end border-bottom border-md-bottom-0 pb-3 pb-md-0 mb-3 mb-md-0">
@@ -112,9 +135,10 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
         </div>
         <!-- Align text to start on mobile, end on desktop -->
         <div class="col-md-5 text-start text-md-end">
-            <div class="small fw-bold text-muted">TOTAL LUMP SUM PAYABLE</div>
-            <!-- text-nowrap prevents symbol overlap -->
-            <div class="display-6 fw-bold text-primary text-nowrap">₹<?php echo number_format($lump_sum_total, 2); ?>
+            <div class="small fw-bold text-muted">TOTAL PAYABLE </div>
+            <div class="display-6 fw-bold text-primary payout-summary-total">
+                <span class="currency-symbol">₹</span><span
+                    class="amount"><?php echo number_format($lump_sum_total, 2); ?></span>
             </div>
         </div>
     </div>
