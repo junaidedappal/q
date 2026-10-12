@@ -173,25 +173,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     throw new Exception('Invalid Schedule ID.');
                 }
 
-                // 1. Fetch the basic record
+                // Fetch the stored schedule data, including its actual name.
                 $stmt = $conn->prepare('SELECT * FROM schedules WHERE id = ?');
-                $stmt->execute([$schedule_id]);
+                $stmt->bind_param('i', $schedule_id);
+                $stmt->execute();
                 $result = $stmt->get_result()->fetch_assoc();
 
                 if (!$result) {
                     throw new Exception('Record not found.');
                 }
-
-                // 2. Calculate Sequential Position
-                // We renamed the alias from 'rank' to 'seq_number' to avoid SQL syntax errors
-                $sid = $result['student_id'];
-                $rank_stmt = $conn->prepare('SELECT COUNT(*) as seq_number FROM schedules WHERE student_id = ? AND id <= ?');
-                $rank_stmt->bind_param('ii', $sid, $schedule_id);
-                $rank_stmt->execute();
-                $rank_data = $rank_stmt->get_result()->fetch_assoc();
-
-                // Use the new alias 'seq_number'
-                $result['name'] = 'Schedule ' . ($rank_data['seq_number'] ?? 1);
 
                 ob_clean();
                 echo json_encode(['status' => 'success', 'data' => $result]);
@@ -573,7 +563,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // 4. CALCULATE PROPOSED HOURS
             $dates_string = $_POST['dates'];
-            $dates_array = array_filter(array_map('trim', explode(', ', $dates_string)));
+            $dates_array = array_values(array_filter(array_map('trim', explode(', ', $dates_string))));
+            if (empty($dates_array)) {
+                echo json_encode(['status' => 'error', 'message' => 'Please select at least one session date.']);
+                exit;
+            }
             $hours_to_add = count($dates_array) * $planned_hours;
 
             // 5. CHECK CURRENT USAGE IN THIS SCHEDULE
@@ -597,13 +591,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            // 7. VALIDATE DATE RANGE (Compare every session date to schedule window)
-            $start_ts = strtotime($sch_data['start_date']);
-            $end_ts = strtotime($sch_data['end_date']);
-
+            // 7. Sessions must be within the schedule and not in a past month.
+            $earliest_allowed_date = date('Y-m-01');
             foreach ($dates_array as $date) {
-                $session_ts = strtotime($date);
-                if ($session_ts < $start_ts || $session_ts > $end_ts) {
+                $parsed_date = DateTime::createFromFormat('!Y-m-d', $date);
+                if (!$parsed_date || $parsed_date->format('Y-m-d') !== $date) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => "Invalid session date: $date."
+                    ]);
+                    exit;
+                }
+
+                if ($_SESSION['role'] !== 'admin' && $date < $earliest_allowed_date) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Sessions cannot be added for dates in a previous month.'
+                    ]);
+                    exit;
+                }
+
+                if ($date < $sch_data['start_date'] || $date > $sch_data['end_date']) {
                     echo json_encode([
                         'status' => 'error',
                         'message' => "Date Error: Session date ($date) is outside the allowed range for this schedule (" . $sch_data['start_date'] . ' to ' . $sch_data['end_date'] . ').'
@@ -681,13 +689,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $current_month = date('Y-m');
                 $session_month = date('Y-m', strtotime($sess_date));
 
-                // if ($session_month < $current_month) {
-                //     echo json_encode([
-                //         'status' => 'error',
-                //         'message' => 'Access Denied: Attendance for previous months is locked because accounts have been cleared. Contact Admin for changes.'
-                //     ]);
-                //     exit;
-                // }
+                if ($session_month < $current_month) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Access Denied: Attendance for previous months is locked because accounts have been cleared. Contact Admin for changes.'
+                    ]);
+                    exit;
+                }
             }
             $student_id = intval($_POST['student_id']);
             $status_attendance = $_POST['attendance_status'];  // '1' or '0'

@@ -24,11 +24,12 @@ $mentor_stmt->execute();
 $mentor = $mentor_stmt->get_result()->fetch_assoc();
 
 $teacher_data = []; 
+$student_data = [];
 $total_sessions_count = 0; 
 $total_teacher_payout = 0;
 
 // 2. Fetch Regular Sessions 
-$session_sql = "SELECT sess.date, sess.planned_hours, sess.teacher_pay, sess.notes, sub.name as subject_name, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Curriculum' as type FROM sessions sess JOIN schedules sch ON sess.schedule_id = sch.id JOIN students stu ON sch.student_id = stu.id JOIN subjects sub ON sess.subject_id = sub.id JOIN teachers t ON sess.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE sch.mentor_id = ? AND sess.status = 'done' AND MONTH(sess.date) = ? AND YEAR(sess.date) = ? ORDER BY u_t.name ASC, sess.date ASC"; 
+$session_sql = "SELECT sess.date, sess.planned_hours, sess.teacher_pay, sess.notes, sub.name as subject_name, stu.id as student_id, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Curriculum' as type FROM sessions sess JOIN schedules sch ON sess.schedule_id = sch.id JOIN students stu ON sch.student_id = stu.id JOIN subjects sub ON sess.subject_id = sub.id JOIN teachers t ON sess.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE sch.mentor_id = ? AND sess.status = 'done' AND MONTH(sess.date) = ? AND YEAR(sess.date) = ? ORDER BY u_t.name ASC, sess.date ASC";
 $s_stmt = $conn->prepare($session_sql); 
 $s_stmt->bind_param("iii", $mentor_id, $month, $year); 
 $s_stmt->execute(); 
@@ -37,12 +38,23 @@ $res_sessions = $s_stmt->get_result();
 while ($s = $res_sessions->fetch_assoc()) {
     $teacher_data[$s['teacher_user_id']]['info'] = ['name' => $s['teacher_name'], 'phone' => $s['teacher_phone']]; 
     $teacher_data[$s['teacher_user_id']]['list'][] = $s; 
+    $student_data[$s['student_id']]['info'] = ['name' => $s['student_name']];
+    $student_data[$s['student_id']]['activities'][] = [
+        'type' => $s['type'],
+        'date' => $s['date'],
+        'subject_name' => $s['subject_name'],
+        'teacher_name' => $s['teacher_name'],
+        'planned_hours' => $s['planned_hours'],
+        'teacher_pay' => $s['teacher_pay'],
+        'teacher_payout' => $s['planned_hours'] * $s['teacher_pay'],
+        'mentor_fee' => $mentor['rate_per_session']
+    ];
     $total_sessions_count++; 
     $total_teacher_payout += ($s['planned_hours'] * $s['teacher_pay']); 
 }
 
 // 3. Fetch Independent Mentor Demos 
-$demo_sql = "SELECT md.demo_date as date, md.duration_hours as planned_hours, g.payment_per_hour as teacher_pay, md.feedback as notes, sub.name as subject_name, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Independent Demo' as type FROM mentor_demos md JOIN students stu ON md.student_id = stu.id JOIN grades g ON stu.class = g.grade_name JOIN subjects sub ON md.subject_id = sub.id JOIN teachers t ON md.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE stu.mentor_id = ? AND MONTH(md.demo_date) = ? AND YEAR(md.demo_date) = ? ORDER BY u_t.name ASC"; 
+$demo_sql = "SELECT md.demo_date as date, md.duration_hours as planned_hours, g.payment_per_hour as teacher_pay, md.feedback as notes, sub.name as subject_name, stu.id as student_id, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Independent Demo' as type FROM mentor_demos md JOIN students stu ON md.student_id = stu.id JOIN grades g ON stu.class = g.grade_name JOIN subjects sub ON md.subject_id = sub.id JOIN teachers t ON md.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE stu.mentor_id = ? AND MONTH(md.demo_date) = ? AND YEAR(md.demo_date) = ? ORDER BY u_t.name ASC";
 $d_stmt = $conn->prepare($demo_sql); 
 $d_stmt->bind_param("iii", $mentor_id, $month, $year); 
 $d_stmt->execute(); 
@@ -53,17 +65,52 @@ while ($d = $res_demos->fetch_assoc()) {
         $teacher_data[$d['teacher_user_id']]['info'] = ['name' => $d['teacher_name'], 'phone' => $d['teacher_phone']]; 
     } 
     $teacher_data[$d['teacher_user_id']]['list'][] = $d; 
+    $student_data[$d['student_id']]['info'] = ['name' => $d['student_name']];
+    $student_data[$d['student_id']]['activities'][] = [
+        'type' => $d['type'],
+        'date' => $d['date'],
+        'subject_name' => $d['subject_name'],
+        'teacher_name' => $d['teacher_name'],
+        'planned_hours' => $d['planned_hours'],
+        'teacher_pay' => $d['teacher_pay'],
+        'teacher_payout' => $d['planned_hours'] * $d['teacher_pay'],
+        'mentor_fee' => $mentor['rate_per_session']
+    ];
+    $total_sessions_count++;
     $total_teacher_payout += ($d['planned_hours'] * $d['teacher_pay']); 
 }
 
 // 4. Fetch Exams 
-$exam_sql = "SELECT ex.exam_date, ex.obtained_mark, sub.name as subject_name, stu.name as student_name FROM schedule_exams ex JOIN schedules sch ON ex.schedule_id = sch.id JOIN students stu ON sch.student_id = stu.id JOIN subjects sub ON ex.subject_id = sub.id WHERE sch.mentor_id = ? AND MONTH(ex.exam_date) = ? AND YEAR(ex.exam_date) = ? ORDER BY ex.exam_date ASC";
+$exam_sql = "SELECT ex.exam_date, ex.obtained_mark, sub.name as subject_name, stu.id as student_id, stu.name as student_name FROM schedule_exams ex JOIN schedules sch ON ex.schedule_id = sch.id JOIN students stu ON sch.student_id = stu.id JOIN subjects sub ON ex.subject_id = sub.id WHERE sch.mentor_id = ? AND MONTH(ex.exam_date) = ? AND YEAR(ex.exam_date) = ? ORDER BY ex.exam_date ASC";
 $e_stmt = $conn->prepare($exam_sql); 
 $e_stmt->bind_param("iii", $mentor_id, $month, $year); 
 $e_stmt->execute(); 
 $exam_res = $e_stmt->get_result();
 $exam_data = $exam_res->fetch_all(MYSQLI_ASSOC);
 $total_exams_count = count($exam_data);
+foreach ($exam_data as $exam) {
+    $student_data[$exam['student_id']]['info'] = ['name' => $exam['student_name']];
+    $student_data[$exam['student_id']]['activities'][] = [
+        'type' => 'Exam',
+        'date' => $exam['exam_date'],
+        'subject_name' => $exam['subject_name'],
+        'teacher_name' => '',
+        'planned_hours' => null,
+        'teacher_pay' => 0,
+        'teacher_payout' => 0,
+        'mentor_fee' => $mentor['rate_per_exam'],
+        'obtained_mark' => $exam['obtained_mark']
+    ];
+}
+uasort($student_data, function ($a, $b) {
+    return strcasecmp($a['info']['name'], $b['info']['name']);
+});
+foreach ($student_data as &$student) {
+    usort($student['activities'], function ($a, $b) {
+        return strcmp($a['date'], $b['date']);
+    });
+}
+unset($student);
 
 // Mentor Calculation 
 $mentor_session_earn = $total_sessions_count * $mentor['rate_per_session']; 
@@ -145,6 +192,24 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
 </div>
 
 <!-- Distribution List -->
+<ul class="nav nav-pills gap-2 mb-4 no-print" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="teacher-report-tab" data-bs-toggle="pill"
+            data-bs-target="#teacher-report" type="button" role="tab" aria-controls="teacher-report"
+            aria-selected="true">
+            <i class="bi bi-person-workspace me-1"></i> Teacher Wise
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="student-report-tab" data-bs-toggle="pill" data-bs-target="#student-report"
+            type="button" role="tab" aria-controls="student-report" aria-selected="false">
+            <i class="bi bi-mortarboard me-1"></i> Student Wise
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="teacher-report" role="tabpanel" aria-labelledby="teacher-report-tab">
 <h5 class="fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Teacher Wise Distribution</h5>
 <?php foreach($teacher_data as $tid => $data): 
     $t_sum = array_sum(array_map(function($i){ return $i['planned_hours'] * $i['teacher_pay']; }, $data['list']));
@@ -203,6 +268,105 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
     </div>
 </div>
 <?php endforeach; ?>
+</div>
+
+<div class="tab-pane fade" id="student-report" role="tabpanel" aria-labelledby="student-report-tab">
+    <h5 class="fw-bold mb-3"><i class="bi bi-mortarboard me-2"></i>Student Wise Report</h5>
+    <?php if (empty($student_data)): ?>
+    <div class="card card-main p-4 text-center text-muted mb-4">
+        No student activity found for this period.
+    </div>
+    <?php else: ?>
+    <?php foreach ($student_data as $student):
+        $student_session_count = 0;
+        $student_exam_count = 0;
+        $student_teacher_payout = 0;
+        $student_mentor_fee = 0;
+        foreach ($student['activities'] as $activity) {
+            if ($activity['type'] === 'Exam') {
+                $student_exam_count++;
+            } else {
+                $student_session_count++;
+            }
+            $student_teacher_payout += $activity['teacher_payout'];
+            $student_mentor_fee += $activity['mentor_fee'];
+        }
+        $student_total = $student_teacher_payout + $student_mentor_fee;
+    ?>
+    <div class="card card-main mb-4 overflow-hidden">
+        <div class="p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom gap-3">
+            <div>
+                <h6 class="fw-bold mb-1"><?php echo htmlspecialchars($student['info']['name'], ENT_QUOTES, 'UTF-8'); ?></h6>
+                <div class="small text-muted">
+                    <?php echo $student_session_count; ?> session<?php echo $student_session_count === 1 ? '' : 's'; ?>
+                    <span class="mx-1">·</span>
+                    <?php echo $student_exam_count; ?> exam<?php echo $student_exam_count === 1 ? '' : 's'; ?>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-3 gap-md-4 text-md-end">
+                <div>
+                    <div class="small text-muted">TEACHER DISTRIBUTION</div>
+                    <div class="fw-bold text-nowrap">₹<?php echo number_format($student_teacher_payout, 2); ?></div>
+                </div>
+                <div>
+                    <div class="small text-muted">MENTOR FEE</div>
+                    <div class="fw-bold text-nowrap">₹<?php echo number_format($student_mentor_fee, 2); ?></div>
+                </div>
+                <div>
+                    <div class="small text-muted">TOTAL</div>
+                    <div class="fw-bold text-primary text-nowrap">₹<?php echo number_format($student_total, 2); ?></div>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead class="bg-light small text-uppercase">
+                    <tr>
+                        <th class="ps-3 ps-md-4">Activity</th>
+                        <th>Date</th>
+                        <th>Subject</th>
+                        <th>Teacher / Result</th>
+                        <th class="text-center">Duration / Mark</th>
+                        <th class="text-end">Teacher Payout</th>
+                        <th class="text-end pe-3 pe-md-4">Mentor Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($student['activities'] as $activity): ?>
+                    <tr>
+                        <td class="ps-3 ps-md-4">
+                            <span class="type-pill <?php echo $activity['type'] === 'Independent Demo' ? 'type-demo' : 'type-curr'; ?>">
+                                <?php echo $activity['type'] === 'Independent Demo' ? 'Demo' : htmlspecialchars($activity['type'], ENT_QUOTES, 'UTF-8'); ?>
+                            </span>
+                        </td>
+                        <td class="small text-nowrap"><?php echo date('d M Y', strtotime($activity['date'])); ?></td>
+                        <td class="small"><?php echo htmlspecialchars($activity['subject_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="small">
+                            <?php if ($activity['type'] === 'Exam'): ?>
+                            Exam result
+                            <?php else: ?>
+                            <?php echo htmlspecialchars($activity['teacher_name'], ENT_QUOTES, 'UTF-8'); ?>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center small text-nowrap">
+                            <?php if ($activity['type'] === 'Exam'): ?>
+                            <?php echo $activity['obtained_mark'] === null ? '—' : htmlspecialchars((string) $activity['obtained_mark'], ENT_QUOTES, 'UTF-8'); ?>
+                            <?php else: ?>
+                            <?php echo number_format((float) $activity['planned_hours'], 2); ?> hrs
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end text-nowrap">₹<?php echo number_format($activity['teacher_payout'], 2); ?></td>
+                        <td class="text-end pe-3 pe-md-4 text-nowrap">₹<?php echo number_format($activity['mentor_fee'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endforeach; ?>
+    <?php endif; ?>
+</div>
+</div>
 
 <!-- Mentor Fee Section -->
 <div class="card card-main bg-white mb-5">
@@ -231,3 +395,4 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
         <span class="h5 mb-0 fw-bold text-nowrap">₹<?php echo number_format($mentor_total, 2); ?></span>
     </div>
 </div>
+<?php include 'includes/footer.php'; ?>

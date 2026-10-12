@@ -22,9 +22,11 @@ $sql = "SELECT
             u.phone as mentor_phone,
             m.rate_per_session,
             m.rate_per_exam,
-            -- 1. Count Total Regular Sessions
-            (SELECT COUNT(*) FROM sessions sess JOIN schedules sch ON sess.schedule_id = sch.id 
-             WHERE sch.mentor_id = m.id AND sess.status = 'done' AND MONTH(sess.date) = ? AND YEAR(sess.date) = ?) as total_sessions,
+                        -- 1. Count completed classes and independent demos
+                        ((SELECT COUNT(*) FROM sessions sess JOIN schedules sch ON sess.schedule_id = sch.id
+                            WHERE sch.mentor_id = m.id AND sess.status = 'done' AND MONTH(sess.date) = ? AND YEAR(sess.date) = ?) +
+                         (SELECT COUNT(*) FROM mentor_demos md JOIN students s ON md.student_id = s.id
+                            WHERE s.mentor_id = m.id AND MONTH(md.demo_date) = ? AND YEAR(md.demo_date) = ?)) as total_sessions,
             -- 2. Count Total Exams
             (SELECT COUNT(*) FROM schedule_exams ex JOIN schedules sch ON ex.schedule_id = sch.id 
              WHERE sch.mentor_id = m.id AND MONTH(ex.exam_date) = ? AND YEAR(ex.exam_date) = ?) as total_exams,
@@ -46,8 +48,9 @@ if ($userRole === 'mentor') {
 }
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param('iiiiiiii', 
+$stmt->bind_param('iiiiiiiiii',
     $selectedMonth, $selectedYear, 
+    $selectedMonth, $selectedYear,
     $selectedMonth, $selectedYear, 
     $selectedMonth, $selectedYear,
     $selectedMonth, $selectedYear
@@ -57,6 +60,8 @@ $result = $stmt->get_result();
 
 $payouts = [];
 $companyTotal = 0;
+$companyTeacherTotal = 0;
+$companyMentorTotal = 0;
 
 while ($row = $result->fetch_assoc()) {
     $mentorOwnEarnings = ($row['total_sessions'] * $row['rate_per_session']) + ($row['total_exams'] * $row['rate_per_exam']);
@@ -69,6 +74,8 @@ while ($row = $result->fetch_assoc()) {
     if ($row['grand_lump_sum'] > 0 || $userRole === 'mentor') {
         $payouts[] = $row;
         $companyTotal += $row['grand_lump_sum'];
+        $companyTeacherTotal += $row['total_teacher_payout'];
+        $companyMentorTotal += $row['mentor_earnings'];
     }
 }
 
@@ -83,7 +90,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); 
 
-    fputcsv($output, ['Mentor Name', 'Phone', 'Sessions', 'Exams', 'Teachers Payout (Inc. Demos)', 'Mentor Fee', 'Grand Total'], ",", "\"", "\\");
+    fputcsv($output, ['Mentor Name', 'Phone', 'Classes & Demos', 'Exams', 'Teachers Payout (Inc. Demos)', 'Mentor Fee', 'Grand Total'], ",", "\"", "\\");
 
     foreach ($payouts as $p) {
         fputcsv($output, [
@@ -174,6 +181,10 @@ body {
     background: rgba(255, 255, 255, 0.2);
     color: white;
 }
+
+.payout-filter {
+    min-height: 42px;
+}
 </style>
 
 <div class="container-fluid px-3 px-sm-4 py-3 py-sm-4">
@@ -182,7 +193,7 @@ body {
         <div class="row gy-3 align-items-center">
             <div class="col-12 col-md-6 text-center text-md-start">
                 <h3 class="fw-bold mb-1 fs-4 fs-md-3">
-                    <i class="bi bi-shield-check me-2"></i>QUIDIE PAYOUTS
+                    <i class="bi bi-shield-check me-2"></i>QUIDEI PAYOUTS
                 </h3>
                 <p class="mb-0 opacity-75 small">Consolidated Mentor & Teacher Distribution</p>
             </div>
@@ -222,14 +233,49 @@ body {
         </div>
     </div>
 
+    <!-- Search and Mentor Filter -->
+    <div class="row g-2 mb-3 mb-md-4">
+        <div class="col-12 col-md-7">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                <input type="search" id="payoutSearch" class="form-control payout-filter border-start-0"
+                    placeholder="Search mentors..." aria-label="Search mentors">
+            </div>
+        </div>
+        <div class="col-12 col-md-5">
+            <select id="mentorFilter" class="form-select payout-filter" aria-label="Filter by mentor">
+                <option value="">All mentors</option>
+                <?php foreach($payouts as $p): ?>
+                <option value="<?php echo (int)$p['mentor_id']; ?>"><?php echo htmlspecialchars($p['mentor_name']); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+
     <!-- Admin Company Total -->
     <?php if($userRole === 'admin'): ?>
     <div class="card border-0 shadow-sm rounded-3 mb-3 mb-md-4">
-        <div
-            class="card-body p-3 d-flex flex-column flex-sm-row justify-content-between align-items-center text-center text-sm-start gap-2">
-            <span class="fw-semibold text-muted small text-uppercase tracking-wide">Total Monthly Outflow</span>
-            <div class="currency-box text-primary fs-4 fw-bold">
-                <span class="currency-sym">₹</span><?php echo number_format($companyTotal, 2); ?>
+        <div class="card-body p-3">
+            <div class="row g-3 text-center">
+                <div class="col-12 col-md-4">
+                    <div class="text-muted fw-semibold small text-uppercase">Teachers Payment Total</div>
+                    <div class="currency-box text-dark fs-5 fw-bold mt-1">
+                        <span class="currency-sym">₹</span><?php echo number_format($companyTeacherTotal, 2); ?>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="text-muted fw-semibold small text-uppercase">Mentors Payment Total</div>
+                    <div class="currency-box text-dark fs-5 fw-bold mt-1">
+                        <span class="currency-sym">₹</span><?php echo number_format($companyMentorTotal, 2); ?>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="text-muted fw-semibold small text-uppercase">Grand Total Monthly Outflow</div>
+                    <div class="currency-box text-primary fs-4 fw-bold mt-1">
+                        <span class="currency-sym">₹</span><?php echo number_format($companyTotal, 2); ?>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -244,7 +290,8 @@ body {
         </div>
         <?php else: ?>
         <?php foreach($payouts as $p): ?>
-        <div class="col-12 col-xl-6">
+        <div class="col-12 col-xl-6 payout-card-item" data-mentor-id="<?php echo (int)$p['mentor_id']; ?>"
+            data-mentor-name="<?php echo htmlspecialchars($p['mentor_name'], ENT_QUOTES); ?>">
             <div class="card card-payout shadow-sm h-100">
                 <div class="card-body p-3 p-sm-4">
 
@@ -285,7 +332,7 @@ body {
                                     <span
                                         class="currency-sym">₹</span><?php echo number_format($p['mentor_earnings'], 2); ?>
                                 </div>
-                                <div class="text-muted" style="font-size: 0.65rem;">(Sessions & Exams)</div>
+                                <div class="text-muted" style="font-size: 0.65rem;">(Classes, Demos &amp; Exams)</div>
                             </div>
                         </div>
 
@@ -308,6 +355,38 @@ body {
         <?php endforeach; ?>
         <?php endif; ?>
     </div>
+    <div id="noPayoutMatches" class="d-none text-center py-4 bg-white rounded-3 shadow-sm text-muted">
+        No mentors match your search.
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('payoutSearch');
+    const mentorFilter = document.getElementById('mentorFilter');
+    const payoutCards = document.querySelectorAll('.payout-card-item');
+    const noMatches = document.getElementById('noPayoutMatches');
+
+    function filterPayouts() {
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        const selectedMentor = mentorFilter.value;
+        let visibleCards = 0;
+
+        payoutCards.forEach(function(card) {
+            const matchesSearch = card.dataset.mentorName.toLowerCase().includes(searchTerm);
+            const matchesMentor = !selectedMentor || card.dataset.mentorId === selectedMentor;
+            const isVisible = matchesSearch && matchesMentor;
+
+            card.classList.toggle('d-none', !isVisible);
+            visibleCards += isVisible ? 1 : 0;
+        });
+
+        noMatches.classList.toggle('d-none', visibleCards > 0 || payoutCards.length === 0);
+    }
+
+    searchInput.addEventListener('input', filterPayouts);
+    mentorFilter.addEventListener('change', filterPayouts);
+});
+</script>
 
 <?php include 'includes/footer.php'; ?>

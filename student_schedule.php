@@ -990,23 +990,34 @@ $(document).ready(function() {
                             .click());
                     return;
                 }
+
+                const currentMonthStart = "<?php echo date('Y-m-01'); ?>";
+                const minDate = userRole === 'admin' || sch.start_date > currentMonthStart ?
+                    sch.start_date : currentMonthStart;
+                const maxDate = sch.end_date;
+
+                if (minDate > maxDate) {
+                    Swal.fire({
+                        title: 'No Available Dates',
+                        text: userRole === 'admin' ? 'This schedule has no available dates.' :
+                            'This schedule has no dates from the current month onward.',
+                        icon: 'warning'
+                    });
+                    return;
+                }
+
                 $('#session_schedule_id').val(scheduleId);
-                flatpickr("#multi_date_picker", {
+                const dateInput = document.querySelector('#multi_date_picker');
+                if (dateInput._flatpickr) dateInput._flatpickr.destroy();
+                flatpickr(dateInput, {
                     mode: "multiple",
                     dateFormat: "Y-m-d",
-                    minDate: sch.start_date,
-                    maxDate: sch.end_date
+                    minDate: minDate,
+                    maxDate: maxDate
                 });
 
 
 
-                // let tOpts = '<option value="">Select Teacher</option>';
-                // teachersAndSubjects.teachers
-                // .sort((a, b) => a.name.localeCompare(b.name))
-                // .forEach(t => {
-                // tOpts += `<option value="${t.id}">${t.name}</option>`;
-                // });
-                // $('#teacher_select').html(tOpts);
 
                 let tOpts = '<option value="">Search Teacher by Name or Code...</option>';
                 teachersAndSubjects.teachers.forEach(t => {
@@ -1053,11 +1064,9 @@ $(document).ready(function() {
                 $('textarea[name="notes"]').val(d.notes);
                 $('#att_teacher_pay').val(parseFloat(d.teacher_pay) > 0 ? d.teacher_pay : d
                     .default_pay);
-                $('#att_duration_hours').val(d.planned_hours);
-                if (d.status === 'missed') $('#status_absent').prop('checked', true)
-                    .trigger(
-                        'change');
-                else $('#status_present').prop('checked', true).trigger('change');
+                const isAbsent = d.status === 'missed';
+                $(isAbsent ? '#status_absent' : '#status_present').prop('checked', true).trigger('change');
+                $('#att_duration_hours').val(isAbsent ? 0 : d.planned_hours);
                 $('#attendanceModal').modal('show');
             }
         }, 'json');
@@ -1065,7 +1074,9 @@ $(document).ready(function() {
 
     $('input[name="attendance_status"]').on('change', function() {
         const isAbs = $('#status_absent').is(':checked');
-        $('#att_duration_hours').prop('disabled', isAbs).val(isAbs ? '0' : '');
+        const durationInput = $('#att_duration_hours').prop('disabled', isAbs);
+        if (isAbs) durationInput.val('0');
+        else if (durationInput.val() === '0') durationInput.val('');
         $('textarea[name="notes"]').prop('required', isAbs);
     });
 

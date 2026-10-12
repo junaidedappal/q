@@ -151,7 +151,7 @@ body {
     <div class="quidei-header mb-4 shadow">
         <div class="row gy-3 align-items-center">
             <div class="col-lg-6">
-                <h2 class="fw-bold mb-1"><i class="bi bi-shield-check me-2"></i>QUIDIE PAYOUTS</h2>
+                <h2 class="fw-bold mb-1"><i class="bi bi-shield-check me-2"></i>QUIDEI PAYOUTS</h2>
                 <p class="mb-0 opacity-75 small">Consolidated Mentor & Teacher Distribution (Including Independent
                     Demos)</p>
             </div>
