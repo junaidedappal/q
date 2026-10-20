@@ -13,7 +13,19 @@ if (!isset($_SESSION['loggedin']) || !in_array($_SESSION['role'], ['admin', 'sup
 $action = $_GET['action'] ?? '';
 
 if ($action === 'get_mentor_students') {
-    $mentor_id = intval($_GET['mentor_id']);
+    $mentor_id = intval($_GET['mentor_id'] ?? 0);
+
+    if ($_SESSION['role'] === 'supervisor') {
+        $access_stmt = $conn->prepare("SELECT id FROM mentors WHERE id = ? AND supervisor_id = ?");
+        $access_stmt->bind_param("ii", $mentor_id, $_SESSION['id']);
+        $access_stmt->execute();
+        if (!$access_stmt->get_result()->fetch_assoc()) {
+            ob_clean();
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Access Denied']);
+            exit;
+        }
+    }
 
     // SQL: Fetches student info, latest schedule dates, total hours, and SUM of completed hours
     $sql = "SELECT s.id, s.name, s.class, s.status, s.checklist_material, s.checklist_group, s.checklist_teams,

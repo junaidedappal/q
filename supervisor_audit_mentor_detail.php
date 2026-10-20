@@ -7,15 +7,25 @@ if (!isset($_SESSION['loggedin']) || !in_array($_SESSION['role'], ['admin', 'sup
     header('location: login.php'); exit;
 }
 
-$mentor_id = intval($_GET['mentor_id']);
+$userRole = $_SESSION['role'];
+$mentor_id = intval($_GET['mentor_id'] ?? 0);
 $month = intval($_GET['month'] ?? date('m'));
 $year = intval($_GET['year'] ?? date('Y'));
 
-// Fetch Mentor Name for Header
-$m_stmt = $conn->prepare("SELECT u.name FROM mentors m JOIN users u ON m.user_id = u.id WHERE m.id = ?");
-$m_stmt->bind_param("i", $mentor_id);
+if ($userRole === 'supervisor') {
+    $m_stmt = $conn->prepare("SELECT u.name FROM mentors m JOIN users u ON m.user_id = u.id WHERE m.id = ? AND m.supervisor_id = ?");
+    $m_stmt->bind_param("ii", $mentor_id, $_SESSION['id']);
+} else {
+    $m_stmt = $conn->prepare("SELECT u.name FROM mentors m JOIN users u ON m.user_id = u.id WHERE m.id = ?");
+    $m_stmt->bind_param("i", $mentor_id);
+}
 $m_stmt->execute();
-$mentor_name = $m_stmt->get_result()->fetch_assoc()['name'] ?? 'Unknown Mentor';
+$mentor = $m_stmt->get_result()->fetch_assoc();
+if ($userRole === 'supervisor' && !$mentor) {
+    header('location: supervisor_monitoring.php');
+    exit;
+}
+$mentor_name = $mentor['name'] ?? 'Unknown Mentor';
 ?>
 
 <style>
@@ -46,7 +56,7 @@ $mentor_name = $m_stmt->get_result()->fetch_assoc()['name'] ?? 'Unknown Mentor';
     class="page-header-gradient text-white p-4 mb-4 rounded-3 shadow-sm d-flex justify-content-between align-items-center">
     <div>
         <h2 class="fw-bold mb-0">Mentor Performance Audit</h2>
-        <p class="mb-0 opacity-75">Reviewing: <b><?php echo $mentor_name; ?></b></p>
+        <p class="mb-0 opacity-75">Reviewing: <b><?php echo htmlspecialchars($mentor_name, ENT_QUOTES, 'UTF-8'); ?></b></p>
     </div>
     <a href="supervisor_monitoring.php?month=<?php echo $month; ?>&year=<?php echo $year; ?>"
         class="btn btn-light btn-sm rounded-pill px-3">

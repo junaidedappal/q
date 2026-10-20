@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
             // Get schedules and their sessions
             $schedules = [];
-            $schedule_stmt = $conn->prepare('SELECT * FROM schedules WHERE student_id = ? ORDER BY start_date DESC');
+            $schedule_stmt = $conn->prepare('SELECT * FROM schedules WHERE student_id = ? ORDER BY start_date DESC, id DESC');
             $schedule_stmt->bind_param('i', $student_id);
             $schedule_stmt->execute();
             $schedule_result = $schedule_stmt->get_result();
@@ -713,8 +713,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // 1. Absence Validation
-            if ($status_attendance == '0' && empty($remarks)) {
-                echo json_encode(['status' => 'error', 'message' => 'Please provide a reason for the absence.']);
+            if (
+                $status_attendance == '0' &&
+                !in_array($remarks, ['Due to Teacher', 'Due to Students'], true)
+            ) {
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Select whether the absence was due to the teacher or the students.'
+                ]);
                 exit;
             }
 

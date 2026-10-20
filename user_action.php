@@ -17,65 +17,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     switch ($action) {
         case 'get_user_details':
             $user_id = intval($_GET['user_id']);
-            $stmt = $conn->prepare("SELECT id, name, email, phone, role, status, can_edit_teacher_payout FROM users WHERE id = ?");
+            $stmt = $conn->prepare("SELECT id, name, email, phone, role, status, can_edit_teacher_payout FROM users WHERE id = ? AND role <> 'teacher'");
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
             $data = $stmt->get_result()->fetch_assoc();
 
-            if ($data) {
-                // Add styled badges for the View modal
-                $role_class = 'bg-secondary';
-                if ($data['role'] === 'admin') $role_class = 'bg-danger';
-                if ($data['role'] === 'sales') $role_class = 'bg-warning text-dark';
-                if ($data['role'] === 'demoAdmin') $role_class = 'bg-info text-dark';
-                if ($data['role'] === 'demoCordinator') $role_class = 'bg-info';
-                if ($data['role'] === 'mentor') $role_class = 'bg-primary';
-                if ($data['role'] === 'teacher') $role_class = 'bg-success';
-                if ($data['role'] === 'accounts') $role_class = 'bg-dark';
-                $data['role_badge'] = '<span class="badge ' . $role_class . '">' . ucfirst($data['role']) . '</span>';
-                $status_class = ($data['status'] === 'active') ? 'bg-success' : 'bg-secondary';
-                $data['status_badge'] = '<span class="badge ' . $status_class . '">' . ucfirst($data['status']) . '</span>';
-
-                // If the user is a teacher, get their extra details
-                if ($data['role'] === 'teacher') {
-                    $teacher_stmt = $conn->prepare("SELECT * FROM teachers WHERE user_id = ?");
-                    $teacher_stmt->bind_param("i", $user_id);
-                    $teacher_stmt->execute();
-                    $data['teacher_details'] = $teacher_stmt->get_result()->fetch_assoc();
-
-                    // --- MODIFICATION START: Fetch subject ID and Name ---
-                    $subjects_stmt = $conn->prepare("
-                        SELECT ts.subject_id, s.name 
-                        FROM teacher_subjects ts 
-                        JOIN teachers t ON ts.teacher_id = t.id 
-                        JOIN subjects s ON ts.subject_id = s.id
-                        WHERE t.user_id = ?
-                    ");
-                    $subjects_stmt->bind_param("i", $user_id);
-                    $subjects_stmt->execute();
-                    $result = $subjects_stmt->get_result();
-                    $subjects = [];
-                    while ($row = $result->fetch_assoc()) {
-                        $subjects[] = $row; // Will be an array of objects like [{subject_id: 1, name: 'Math'}, ...]
-                    }
-                    $data['teacher_subjects_details'] = $subjects;
-                    // --- MODIFICATION END ---
-
-                    // Keep this for the edit form which just needs IDs
-                    $subjects_stmt = $conn->prepare("SELECT ts.subject_id FROM teacher_subjects ts JOIN teachers t ON ts.teacher_id = t.id WHERE t.user_id = ?");
-                    $subjects_stmt->bind_param("i", $user_id);
-                    $subjects_stmt->execute();
-                    $result = $subjects_stmt->get_result();
-                    $subject_ids = [];
-                    while ($row = $result->fetch_assoc()) { $subject_ids[] = $row['subject_id']; }
-                    $data['teacher_subjects'] = $subject_ids;
-                }
+            if (!$data) {
+                echo json_encode(['status' => 'error', 'message' => 'User not found.']);
+                break;
             }
+
+            $role_class = 'bg-secondary';
+            if ($data['role'] === 'admin') $role_class = 'bg-danger';
+            if ($data['role'] === 'sales') $role_class = 'bg-warning text-dark';
+            if ($data['role'] === 'demoAdmin') $role_class = 'bg-info text-dark';
+            if ($data['role'] === 'demoCordinator') $role_class = 'bg-info';
+            if ($data['role'] === 'mentor') $role_class = 'bg-primary';
+            if ($data['role'] === 'accounts') $role_class = 'bg-dark';
+            if ($data['role'] === 'qualitycontroller') $role_class = 'bg-warning text-dark';
+            $role_label = ($data['role'] === 'qualitycontroller') ? 'Quality Controller' : ucfirst($data['role']);
+            $data['role_badge'] = '<span class="badge ' . $role_class . '">' . $role_label . '</span>';
+            $status_class = ($data['status'] === 'active') ? 'bg-success' : 'bg-secondary';
+            $data['status_badge'] = '<span class="badge ' . $status_class . '">' . ucfirst($data['status']) . '</span>';
+
             echo json_encode(['status' => 'success', 'data' => $data]);
             break;
 
         default: // Get list for DataTable
-            $sql = "SELECT id, name, email, role, status, can_edit_teacher_payout FROM users ORDER BY id DESC";
+            $sql = "SELECT id, name, email, role, status, can_edit_teacher_payout FROM users WHERE role <> 'teacher' ORDER BY id DESC";
             $result = $conn->query($sql);
             $data = [];
             while ($row = $result->fetch_assoc()) {
@@ -85,9 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 if ($row['role'] === 'demoAdmin') $role_class = 'bg-info text-dark';
                 if ($row['role'] === 'demoCordinator') $role_class = 'bg-info';
                 if ($row['role'] === 'mentor') $role_class = 'bg-primary';
-                if ($row['role'] === 'teacher') $role_class = 'bg-success';
                 if ($row['role'] === 'accounts') $role_class = 'bg-dark';
-                $row['role_badge'] = '<span class="badge ' . $role_class . '">' . htmlspecialchars(ucfirst($row['role'])) . '</span>';
+                if ($row['role'] === 'qualitycontroller') $role_class = 'bg-warning text-dark';
+                $role_label = ($row['role'] === 'qualitycontroller') ? 'Quality Controller' : ucfirst($row['role']);
+                $row['role_badge'] = '<span class="badge ' . $role_class . '">' . htmlspecialchars($role_label) . '</span>';
                 
                 $status_class = ($row['status'] === 'active') ? 'bg-success' : 'bg-secondary';
                 $row['status_badge'] = '<span class="badge ' . $status_class . '">' . htmlspecialchars(ucfirst($row['status'])) . '</span>';
@@ -127,30 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // --- Helper Functions (These are correct) ---
-    function manageTeacherProfile($conn, $user_id, $post_data) {
-        $teacher = $conn->query("SELECT id FROM teachers WHERE user_id = $user_id")->fetch_assoc();
-        $teacher_id = null;
-        if ($teacher) {
-            $teacher_id = $teacher['id'];
-            $stmt = $conn->prepare("UPDATE teachers SET teacher_reg_code=?, hourly_rate=?, bio=?, experience_years=?, qualifications=?, address=? WHERE id=?");
-            $stmt->bind_param("sdsssi", $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address'], $teacher_id);
-            $stmt->execute();
-        } else {
-            $stmt = $conn->prepare("INSERT INTO teachers (user_id, teacher_reg_code, hourly_rate, bio, experience_years, qualifications, address) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isdssis", $user_id, $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address']);
-            $stmt->execute();
-            $teacher_id = $conn->insert_id;
-        }
-        $conn->query("DELETE FROM teacher_subjects WHERE teacher_id = $teacher_id");
-        if (!empty($post_data['teacher_subjects'])) {
-            $subject_stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_id) VALUES (?, ?)");
-            foreach ($post_data['teacher_subjects'] as $subject_id) {
-                $subject_stmt->bind_param("ii", $teacher_id, $subject_id);
-                $subject_stmt->execute();
-            }
-        }
-    }
+    // --- Helper Functions ---
     function manageMentorProfile($conn, $user_id) {
         $mentor = $conn->query("SELECT id FROM mentors WHERE user_id = $user_id")->fetch_assoc();
         if (!$mentor) {
@@ -164,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      try {
          switch ($action) {
              case 'add':
+                 if (($_POST['role'] ?? '') === 'teacher') throw new Exception('Manage teacher accounts from the Teachers module.');
                  if (empty($_POST['password'])) throw new Exception('Password is required for new users.');
                  $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
                  $stmt->bind_param("s", $_POST['email']);
@@ -176,9 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  $stmt->execute();
                  $user_id = $conn->insert_id;
  
-                 if ($_POST['role'] === 'teacher') {
-                     manageTeacherProfile($conn, $user_id, $_POST);
-                 }
                  if ($_POST['role'] === 'mentor') {
                      manageMentorProfile($conn, $user_id);
                  }
@@ -186,6 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  
              case 'edit':
                  $user_id = $_POST['user_id'];
+                 if (($_POST['role'] ?? '') === 'teacher') throw new Exception('Manage teacher accounts from the Teachers module.');
+                 $current_user_stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
+                 $current_user_stmt->bind_param("i", $user_id);
+                 $current_user_stmt->execute();
+                 $current_user = $current_user_stmt->get_result()->fetch_assoc();
+                 if (!$current_user || $current_user['role'] === 'teacher') {
+                     throw new Exception('Manage teacher accounts from the Teachers module.');
+                 }
                  $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
                  $stmt->bind_param("si", $_POST['email'], $user_id);
                  $stmt->execute();
@@ -201,9 +154,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  }
                  $stmt->execute();
  
-                 if ($_POST['role'] === 'teacher') {
-                     manageTeacherProfile($conn, $user_id, $_POST);
-                 }
                  if ($_POST['role'] === 'mentor') {
                      manageMentorProfile($conn, $user_id);
                  }
@@ -212,7 +162,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              case 'delete':
                  $user_id = $_POST['user_id'];
                  if ($user_id == $_SESSION['id']) throw new Exception('You cannot delete your own account.');
-                 // Note: The foreign key ON DELETE CASCADE will handle deleting the mentor/teacher profile.
+                 $current_user_stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
+                 $current_user_stmt->bind_param("i", $user_id);
+                 $current_user_stmt->execute();
+                 $current_user = $current_user_stmt->get_result()->fetch_assoc();
+                 if (!$current_user || $current_user['role'] === 'teacher') {
+                     throw new Exception('Manage teacher accounts from the Teachers module.');
+                 }
                  $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
                  $stmt->bind_param("i", $user_id);
                  $stmt->execute();

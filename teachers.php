@@ -114,8 +114,8 @@ body {
 <div class="card glass-card">
     <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-3 px-4">
         <h5 class="card-title mb-0 text-dark">All Registered Teachers</h5>
-        <a href="users.php" class="btn btn-primary btn-gradient-teacher shadow-sm">
-            <i class="bi bi-person-plus-fill me-1"></i>Add / Manage All Users
+        <a href="user_teachers.php" class="btn btn-primary btn-gradient-teacher shadow-sm">
+            <i class="bi bi-person-plus-fill me-1"></i>Add / Manage Teachers
         </a>
     </div>
     <div class="card-body">
@@ -285,22 +285,23 @@ $(document).ready(function() {
 
     $('#teachersTable tbody').on('click', '.btn-edit', function() {
         var id = $(this).data('id');
-        $.get('user_action.php', {
-            action: 'get_user_details',
+        $.get('teacher_action.php', {
+            action: 'get_teacher_details',
             user_id: id
         }, function(response) {
-            if (response.status === 'success') {
+            if (response.status === 'success' && response.data.user_details) {
                 var d = response.data;
+                var user = d.user_details;
                 $('#userForm')[0].reset();
                 $('#teacher-selected-subjects-container, #teacher-hidden-subjects-inputs')
                     .empty();
 
-                $('#userModalLabel').text('Edit Teacher: ' + d.name);
-                $('#user_id').val(d.id);
-                $('input[name="name"]').val(d.name);
-                $('input[name="email"]').val(d.email);
-                $('input[name="phone"]').val(d.phone);
-                $('select[name="status"]').val(d.status);
+                $('#userModalLabel').text('Edit Teacher: ' + user.name);
+                $('#user_id').val(user.id);
+                $('input[name="name"]').val(user.name);
+                $('input[name="email"]').val(user.email);
+                $('input[name="phone"]').val(user.phone);
+                $('select[name="status"]').val(user.status);
                 $('input[name="password"]').prop('required', false);
 
                 if (d.teacher_details) {
@@ -334,7 +335,7 @@ $(document).ready(function() {
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                $.post('user_action.php', {
+                $.post('teacher_action.php', {
                     action: 'delete',
                     user_id: id
                 }, function(response) {
@@ -351,7 +352,7 @@ $(document).ready(function() {
 
     $('#userForm').on('submit', function(e) {
         e.preventDefault();
-        $.post('user_action.php', $(this).serialize(), function(response) {
+        $.post('teacher_action.php', $(this).serialize(), function(response) {
             if (response.status === 'success') {
                 $('#userModal').modal('hide');
                 Swal.fire('Success!', response.message, 'success');

@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                        sch.id as schedule_id, sch.start_date, sch.end_date, sch.total_hours, sch.paid_hours
                 FROM students s
                 LEFT JOIN schedules sch ON sch.id = (
-                    SELECT id FROM schedules WHERE student_id = s.id ORDER BY id DESC LIMIT 1
+                    SELECT id FROM schedules WHERE student_id = s.id ORDER BY start_date DESC, id DESC LIMIT 1
                 )
                 WHERE s.id = ?
             ');
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN mentors m ON s.mentor_id = m.id 
             LEFT JOIN users u ON m.user_id = u.id
             LEFT JOIN schedules sch ON sch.id = (
-                SELECT id FROM schedules WHERE student_id = s.id ORDER BY id DESC LIMIT 1
+                SELECT id FROM schedules WHERE student_id = s.id ORDER BY start_date DESC, id DESC LIMIT 1
             )
             ) ORDER BY record_id DESC";
 

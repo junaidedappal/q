@@ -11,7 +11,8 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
 // --- 1. GREETING AND USER INFO ---
 $userRole = $_SESSION['role'];
-$userName = htmlspecialchars($_SESSION['name']);
+$userName = htmlspecialchars($_SESSION['name'] ?? '', ENT_QUOTES, 'UTF-8');
+$roleLabel = $userRole === 'qualitycontroller' ? 'Quality Controller' : ucfirst($userRole);
 $currentHour = date('G');
 
 if ($currentHour < 12) {
@@ -255,25 +256,259 @@ if ($currentHour < 12) {
     font-weight: 800;
     color: var(--slate-800);
 }
+
+body {
+    background-color: #f4f7fb;
+}
+
+.dashboard-shell {
+    width: 100%;
+    max-width: 1680px;
+    margin: 0 auto;
+    padding-inline: clamp(.75rem, 2.5vw, 2rem);
+}
+
+.dashboard-hero {
+    min-height: 168px;
+    padding: clamp(1.25rem, 4vw, 2.5rem);
+    margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+    color: #fff;
+    background: linear-gradient(125deg, #064e3b 0%, #047857 55%, #0f766e 100%);
+    border: 0;
+    box-shadow: 0 18px 38px rgba(6, 78, 59, .18);
+}
+
+.dashboard-hero::before {
+    content: "";
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    top: -13rem;
+    right: -5rem;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2rem rgba(255, 255, 255, .035), 0 0 0 4rem rgba(255, 255, 255, .025);
+    pointer-events: none;
+}
+
+.dashboard-hero > div:not(.dashboard-hero-art) {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-greeting {
+    max-width: 100%;
+    color: #fff;
+    font-size: clamp(1.55rem, 5.5vw, 2.65rem);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -.045em;
+    overflow-wrap: anywhere;
+}
+
+.hero-subtitle {
+    margin-top: 0;
+    color: rgba(255, 255, 255, .78);
+    font-size: .85rem;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: .35rem .7rem;
+    color: #ecfdf5;
+    background: rgba(255, 255, 255, .15);
+    border: 1px solid rgba(255, 255, 255, .24);
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 800;
+}
+
+.dashboard-hero-art {
+    position: absolute;
+    z-index: 0;
+    right: clamp(1rem, 5vw, 4rem);
+    bottom: -2.5rem;
+    color: rgba(255, 255, 255, .12);
+    font-size: clamp(7rem, 17vw, 12rem);
+    line-height: 1;
+    pointer-events: none;
+}
+
+.section-header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 1rem;
+}
+
+.section-kicker {
+    margin: 0 0 .2rem;
+    color: var(--emerald-600);
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.section-header h2 {
+    margin: 0;
+    color: var(--slate-800);
+    font-size: clamp(1.15rem, 3vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: -.03em;
+}
+
+.section-description {
+    margin: 0;
+    color: var(--slate-500);
+    font-size: .82rem;
+}
+
+.module-card {
+    isolation: isolate;
+    min-height: 164px;
+    padding: 1rem .65rem;
+    border-color: #e8eef5;
+    border-radius: 1.15rem;
+    box-shadow: 0 7px 18px rgba(15, 23, 42, .045);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.module-card:focus-visible {
+    outline: 3px solid rgba(16, 185, 129, .45);
+    outline-offset: 3px;
+}
+
+.module-card::after {
+    z-index: -1;
+    transition: opacity .2s ease;
+}
+
+.module-card:hover::after,
+.module-card:focus-visible::after {
+    opacity: .045;
+}
+
+@media (hover: hover) {
+    .module-card:hover {
+        transform: translateY(-4px);
+        border-color: #a7f3d0;
+        box-shadow: 0 15px 28px rgba(15, 23, 42, .09);
+    }
+}
+
+.card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    margin-bottom: .8rem;
+    background: var(--icon-gradient);
+    border-radius: .95rem;
+    box-shadow: 0 7px 14px rgba(15, 23, 42, .12);
+    font-size: 1.35rem;
+}
+
+.card-title {
+    margin-bottom: .35rem;
+    font-size: .94rem;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.card-description {
+    margin: 0;
+    font-size: .73rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.dashboard-signout {
+    min-height: 44px;
+}
+
+@media (min-width: 576px) {
+    .module-card {
+        min-height: 188px;
+        padding: 1.25rem .9rem;
+    }
+
+    .card-icon {
+        width: 54px;
+        height: 54px;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .card-title {
+        font-size: 1rem;
+    }
+
+    .card-description {
+        font-size: .8rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .dashboard-shell {
+        padding-inline: .75rem;
+    }
+
+    .dashboard-hero {
+        min-height: 150px;
+        border-radius: 1.2rem;
+    }
+
+    .dashboard-hero-art {
+        right: .35rem;
+        bottom: -1.3rem;
+    }
+
+    .section-header {
+        align-items: start;
+    }
+
+    .section-description {
+        display: none;
+    }
+
+    .dashboard-signout {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .module-card,
+    .module-card::after {
+        transition: none;
+    }
+}
 </style>
 
+<main class="dashboard-shell container-fluid py-3 py-lg-4">
 <div class="dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
     <div>
         <div class="hero-greeting"><?php echo $greeting; ?>, <?php echo $userName; ?> <?php echo $greetingIcon; ?></div>
         <div class="d-flex align-items-center gap-2 mt-2">
-            <span class="role-badge"><?php echo $userRole; ?></span>
-            <span class="text-muted small">• Welcome back!</span>
+            <span class="role-badge"><?php echo htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="hero-subtitle">Welcome back to your workspace</span>
         </div>
     </div>
-
-
+    <div class="dashboard-hero-art" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></div>
 </div>
 
-
-
 <div class="section-header">
-    <h4>Quick Access</h4>
-    <div class="header-line"></div>
+    <div>
+        <p class="section-kicker">Your workspace</p>
+        <h2>Quick Access</h2>
+    </div>
+    <p class="section-description">Choose a module to continue your work.</p>
 </div>
 
 <div class="row g-3 mb-5">
@@ -453,15 +688,18 @@ if ($currentHour < 12) {
     </div>
     <?php endif; ?>
 
-    <?php if ($userRole == 'admin'): ?>
+    <?php if (in_array($userRole, ['admin', 'qualitycontroller', 'supervisor'], true)): ?>
     <div class="col-6 col-md-4 col-lg-3">
         <a href="mentor_activity.php" class="module-card card-monitoring">
             <div class="card-icon"><i class="bi bi-calendar2-check-fill"></i></div>
             <h5 class="card-title">Mentor Activity</h5>
-            <p class="card-description">Live Session Monitoring</p>
+            <p class="card-description"><?= $userRole === 'supervisor' ? 'Sessions for your assigned mentors' : 'All mentor sessions and attendance' ?></p>
         </a>
     </div>
 
+    <?php endif; ?>
+
+    <?php if ($userRole === 'admin'): ?>
     <div class="col-6 col-md-4 col-lg-3">
         <a href="subjects.php" class="module-card card-subjects">
             <div class="card-icon"><i class="bi bi-bookmarks-fill"></i></div>
@@ -481,9 +719,10 @@ if ($currentHour < 12) {
 </div>
 
 <div class="text-center pb-5">
-    <a href="logout.php" class="btn btn-outline-danger px-4 rounded-pill fw-bold">
+    <a href="logout.php" class="dashboard-signout btn btn-outline-danger px-4 rounded-pill fw-bold">
         <i class="bi bi-power me-2"></i>Sign Out
     </a>
 </div>
+</main>
 
 <?php include 'includes/footer.php'; ?>

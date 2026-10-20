@@ -466,10 +466,20 @@ body {
 
 
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Remarks / Notes</label>
-                        <textarea name="notes" class="form-control" rows="2"
-                            placeholder="e.g. Topics covered OR Reason for absence..."></textarea>
+                    <div class="mb-3 d-none" id="absence_reason_container">
+                        <label for="attendance_absence_reason" class="form-label fw-bold small">Reason for absence <span
+                                class="text-danger">*</span></label>
+                        <select name="notes" id="attendance_absence_reason" class="form-select" disabled required>
+                            <option value="">Select a reason</option>
+                            <option value="Due to Teacher">Due to Teacher</option>
+                            <option value="Due to Students">Due to Students</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="session_notes_container">
+                        <label for="attendance_notes" class="form-label fw-bold small">Remarks / Notes</label>
+                        <textarea name="notes" id="attendance_notes" class="form-control" rows="2"
+                            placeholder="e.g. Topics covered..."></textarea>
                     </div>
 
                 </div>
@@ -1061,10 +1071,14 @@ $(document).ready(function() {
         }, function(res) {
             if (res.status === 'success') {
                 const d = res.data;
-                $('textarea[name="notes"]').val(d.notes);
+                const isAbsent = d.status === 'missed';
+                const absenceReasons = ['Due to Teacher', 'Due to Students'];
+                $('#attendance_notes').val(isAbsent ? '' : (d.notes || ''));
+                $('#attendance_absence_reason').val(
+                    isAbsent && absenceReasons.includes(d.notes) ? d.notes : ''
+                );
                 $('#att_teacher_pay').val(parseFloat(d.teacher_pay) > 0 ? d.teacher_pay : d
                     .default_pay);
-                const isAbsent = d.status === 'missed';
                 $(isAbsent ? '#status_absent' : '#status_present').prop('checked', true).trigger('change');
                 $('#att_duration_hours').val(isAbsent ? 0 : d.planned_hours);
                 $('#attendanceModal').modal('show');
@@ -1077,7 +1091,16 @@ $(document).ready(function() {
         const durationInput = $('#att_duration_hours').prop('disabled', isAbs);
         if (isAbs) durationInput.val('0');
         else if (durationInput.val() === '0') durationInput.val('');
-        $('textarea[name="notes"]').prop('required', isAbs);
+        $('#absence_reason_container').toggleClass('d-none', !isAbs);
+        $('#session_notes_container').toggleClass('d-none', isAbs);
+        $('#attendance_absence_reason').prop({
+            disabled: !isAbs,
+            required: isAbs
+        });
+        $('#attendance_notes').prop({
+            disabled: isAbs,
+            required: false
+        });
     });
 
     // --- EXAM MANAGEMENT (SUPERVISOR RESTRICTED) ---

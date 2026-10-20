@@ -60,7 +60,8 @@ $result = $stmt->get_result();
 
 $payouts = [];
 $companyTotal = 0;
-$companyTeacherTotal = 0;
+$companyRegularTeacherTotal = 0;
+$companyDemoTeacherTotal = 0;
 $companyMentorTotal = 0;
 
 while ($row = $result->fetch_assoc()) {
@@ -74,7 +75,8 @@ while ($row = $result->fetch_assoc()) {
     if ($row['grand_lump_sum'] > 0 || $userRole === 'mentor') {
         $payouts[] = $row;
         $companyTotal += $row['grand_lump_sum'];
-        $companyTeacherTotal += $row['total_teacher_payout'];
+        $companyRegularTeacherTotal += floatval($row['total_session_teacher_payout'] ?? 0);
+        $companyDemoTeacherTotal += floatval($row['total_demo_teacher_payout'] ?? 0);
         $companyMentorTotal += $row['mentor_earnings'];
     }
 }
@@ -258,19 +260,25 @@ body {
     <div class="card border-0 shadow-sm rounded-3 mb-3 mb-md-4">
         <div class="card-body p-3">
             <div class="row g-3 text-center">
-                <div class="col-12 col-md-4">
-                    <div class="text-muted fw-semibold small text-uppercase">Teachers Payment Total</div>
+                <div class="col-12 col-md-3">
+                    <div class="text-muted fw-semibold small text-uppercase">Teachers Regular Class Payment Total</div>
                     <div class="currency-box text-dark fs-5 fw-bold mt-1">
-                        <span class="currency-sym">₹</span><?php echo number_format($companyTeacherTotal, 2); ?>
+                        <span class="currency-sym">₹</span><?php echo number_format($companyRegularTeacherTotal, 2); ?>
                     </div>
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-3">
+                    <div class="text-muted fw-semibold small text-uppercase">Teachers Demo Class Payment Total</div>
+                    <div class="currency-box text-dark fs-5 fw-bold mt-1">
+                        <span class="currency-sym">₹</span><?php echo number_format($companyDemoTeacherTotal, 2); ?>
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
                     <div class="text-muted fw-semibold small text-uppercase">Mentors Payment Total</div>
                     <div class="currency-box text-dark fs-5 fw-bold mt-1">
                         <span class="currency-sym">₹</span><?php echo number_format($companyMentorTotal, 2); ?>
                     </div>
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-3">
                     <div class="text-muted fw-semibold small text-uppercase">Grand Total Monthly Outflow</div>
                     <div class="currency-box text-primary fs-4 fw-bold mt-1">
                         <span class="currency-sym">₹</span><?php echo number_format($companyTotal, 2); ?>

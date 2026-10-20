@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $user_id = intval($_GET['user_id']);
             $data = [];
             // Get user part
-            $stmt = $conn->prepare("SELECT id, name, email, phone, status FROM users WHERE id = ?");
+            $stmt = $conn->prepare("SELECT id, name, email, phone, status FROM users WHERE id = ? AND role = 'teacher'");
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
             $data['user_details'] = $stmt->get_result()->fetch_assoc();
@@ -75,11 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($teacher) {
             $teacher_id = $teacher['id'];
             $stmt = $conn->prepare("UPDATE teachers SET teacher_reg_code=?, hourly_rate=?, bio=?, experience_years=?, qualifications=?, address=? WHERE id=?");
-            $stmt->bind_param("sdsssi", $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address'], $teacher_id);
+            $stmt->bind_param("sdsissi", $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address'], $teacher_id);
             $stmt->execute();
         } else {
             $stmt = $conn->prepare("INSERT INTO teachers (user_id, teacher_reg_code, hourly_rate, bio, experience_years, qualifications, address) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isdssis", $user_id, $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address']);
+            $stmt->bind_param("isdsiss", $user_id, $post_data['teacher_reg_code'], $post_data['hourly_rate'], $post_data['bio'], $post_data['experience_years'], $post_data['qualifications'], $post_data['address']);
             $stmt->execute();
             $teacher_id = $conn->insert_id;
         }
@@ -97,6 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         switch ($action) {
             case 'add':
+                if (($_POST['role'] ?? '') !== 'teacher') {
+                    throw new Exception('This endpoint only manages teacher accounts.');
+                }
                 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
                 $stmt->bind_param("s", $_POST['email']);
                 $stmt->execute();
@@ -113,7 +116,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             case 'edit':
-                $user_id = $_POST['user_id'];
+                $user_id = intval($_POST['user_id'] ?? 0);
+                if (($_POST['role'] ?? '') !== 'teacher') {
+                    throw new Exception('This endpoint only manages teacher accounts.');
+                }
+                $teacher_check = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'");
+                $teacher_check->bind_param("i", $user_id);
+                $teacher_check->execute();
+                if (!$teacher_check->get_result()->fetch_assoc()) {
+                    throw new Exception('Teacher account not found.');
+                }
                 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
                 $stmt->bind_param("si", $_POST['email'], $user_id);
                 $stmt->execute();
@@ -134,8 +146,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             case 'delete':
-                $user_id = $_POST['user_id'];
+                $user_id = intval($_POST['user_id'] ?? 0);
                 if ($user_id == $_SESSION['id']) throw new Exception('You cannot delete your own account.');
+                $teacher_check = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'");
+                $teacher_check->bind_param("i", $user_id);
+                $teacher_check->execute();
+                if (!$teacher_check->get_result()->fetch_assoc()) {
+                    throw new Exception('Teacher account not found.');
+                }
                 $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
