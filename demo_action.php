@@ -44,38 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             echo json_encode(['status' => 'success', 'subjects' => $subjects_data]);
             break;
-        // === NEW CASE FOR FETCHING TEACHERS just fetch all teachers for any subject, and filter in the frontend.
-        // case 'get_teachers':
-        //     $subject_id = $_GET['subject_id'] ?? null;
-
-        //     $sql = 'SELECT t.id, u.name, t.teacher_reg_code
-        //             FROM teachers t 
-        //             JOIN users u ON t.user_id = u.id ';
-
-        //     $params = [];
-        //     $types = '';
-
-        //     if ($subject_id && is_numeric($subject_id)) {
-        //         $sql .= " JOIN teacher_subjects ts ON t.id = ts.teacher_id WHERE ts.subject_id = ? AND u.status = 'active'";
-        //         $params[] = $subject_id;
-        //         $types .= 'i';
-        //     } else {
-        //         $sql .= " WHERE u.status = 'active'";
-        //     }
-
-        //     $stmt = $conn->prepare($sql);
-        //     if (!empty($params)) {
-        //         $stmt->bind_param($types, ...$params);
-        //     }
-        //     $stmt->execute();
-        //     $result = $stmt->get_result();
-        //     $teachers = [];
-        //     while ($row = $result->fetch_assoc()) {
-        //         $row['display_name'] = $row['name'] . ($row['teacher_reg_code'] ? ' (' . $row['teacher_reg_code'] . ')' : '');
-        //         $teachers[] = $row;
-        //     }
-        //     echo json_encode(['status' => 'success', 'teachers' => $teachers]);
-        //     break;
+        
 
         case 'get_teachers':
             $sql = "SELECT t.id, u.name, t.teacher_reg_code

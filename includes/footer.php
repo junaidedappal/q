@@ -38,7 +38,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <div class="row align-items-center">
             <div class="col-md-6 text-center text-md-start">
                 <p class="footer-copyright mb-0">
-                    © <?php echo date('Y'); ?> <strong><a href="https://infonile.com" target="_blank"
+                    © <?php echo date('Y'); ?> <strong><a href="https://infonile.in" target="_blank"
                             class="text-decoration-none">INFONILE</a></strong>
                 </p>
             </div>

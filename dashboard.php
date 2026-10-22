@@ -291,7 +291,7 @@ body {
     pointer-events: none;
 }
 
-.dashboard-hero > div:not(.dashboard-hero-art) {
+.dashboard-hero>div:not(.dashboard-hero-art) {
     position: relative;
     z-index: 1;
 }
@@ -484,6 +484,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .module-card,
     .module-card::after {
         transition: none;
@@ -492,155 +493,156 @@ body {
 </style>
 
 <main class="dashboard-shell container-fluid py-3 py-lg-4">
-<div class="dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-    <div>
-        <div class="hero-greeting"><?php echo $greeting; ?>, <?php echo $userName; ?> <?php echo $greetingIcon; ?></div>
-        <div class="d-flex align-items-center gap-2 mt-2">
-            <span class="role-badge"><?php echo htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="hero-subtitle">Welcome back to your workspace</span>
+    <div class="dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <div class="hero-greeting"><?php echo $greeting; ?>, <?php echo $userName; ?> <?php echo $greetingIcon; ?>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <span class="role-badge"><?php echo htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+                <span class="hero-subtitle">Welcome back to your workspace</span>
+            </div>
         </div>
-    </div>
-    <div class="dashboard-hero-art" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></div>
-</div>
-
-<div class="section-header">
-    <div>
-        <p class="section-kicker">Your workspace</p>
-        <h2>Quick Access</h2>
-    </div>
-    <p class="section-description">Choose a module to continue your work.</p>
-</div>
-
-<div class="row g-3 mb-5">
-    <?php if ($userRole == 'sales' || $userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="enquiries.php" class="module-card card-enquiries">
-            <div class="card-icon"><i class="bi bi-person-plus-fill"></i></div>
-            <h5 class="card-title">Enquiries</h5>
-            <p class="card-description">Lead Management</p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if ($userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="sales_dashboard.php" class="module-card card-sales">
-            <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
-            <h5 class="card-title">Sales Analytics</h5>
-            <p class="card-description">Performance Tracking</p>
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php if ($userRole == 'sales' || $userRole == 'admin'): ?>
-
-
-    <!-- NEW: Student Records Card -->
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="finalized_students.php" class="module-card card-admissions">
-            <div class="card-icon"><i class="bi bi-mortarboard-fill"></i></div>
-            <h5 class="card-title">Student Records</h5>
-            <p class="card-description">Master Data Management</p>
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php if (in_array($userRole, ['demoAdmin', 'demoCordinator', 'admin'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="demos.php" class="module-card card-demos">
-            <div class="card-icon"><i class="bi bi-play-btn-fill"></i></div>
-            <h5 class="card-title">Manage Demo Classes </h5>
-            <p class="card-description">Live Session </p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin', 'demoAdmin'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="all_demos.php" class="module-card card-all-demos">
-            <div class="card-icon"><i class="bi bi-archive-fill"></i></div>
-            <h5 class="card-title">Demo Overview</h5>
-            <p class="card-description">History </p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin', 'demoAdmin', 'demoCordinator'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="demo_payouts.php" class="module-card card-payouts">
-            <div class="card-icon"><i class="bi bi-wallet-fill"></i></div>
-            <h5 class="card-title">Demo Class Payouts</h5>
-            <p class="card-description">Payout for Teachers</p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin', 'demoAdmin'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="coordinator_payouts.php" class="module-card card-coord-payouts">
-            <div class="card-icon"><i class="bi bi-people-fill"></i></div>
-            <h5 class="card-title">Demo Coordinates Payouts</h5>
-            <p class="card-description">Payout for Cordinators</p>
-        </a>
+        <div class="dashboard-hero-art" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></div>
     </div>
 
-    <!-- Link added to the whole container -->
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="demo_report.php" class="module-card card-reports">
-            <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
-            <h5 class="card-title">Monthly Analytics</h5>
-            <p class="card-description">Demo Performance Report</p>
-        </a>
+    <div class="section-header">
+        <div>
+            <p class="section-kicker">Your workspace</p>
+            <h2>Quick Access</h2>
+        </div>
+        <p class="section-description">Choose a module to continue your work.</p>
     </div>
-    <?php endif; ?>
 
-    <?php if ($userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="admissions.php" class="module-card card-admissions">
-            <div class="card-icon"><i class="bi bi-check-circle-fill"></i></div>
-            <h5 class="card-title">Admissions</h5>
-            <p class="card-description">Student Enrollment</p>
-        </a>
-    </div>
-    <?php endif; ?>
+    <div class="row g-3 mb-5">
+        <?php if ($userRole == 'sales' || $userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="enquiries.php" class="module-card card-enquiries">
+                <div class="card-icon"><i class="bi bi-person-plus-fill"></i></div>
+                <h5 class="card-title">Enquiries</h5>
+                <p class="card-description">Lead Management</p>
+            </a>
+        </div>
+        <?php endif; ?>
 
-    <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="my_students.php" class="module-card card-mentor">
-            <div class="card-icon"><i class="bi bi-mortarboard-fill"></i></div>
-            <h5 class="card-title">My Students</h5>
-            <p class="card-description">Managed by Mentors</p>
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php if ($userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="mentors.php" class="module-card card-mentors-config">
-            <div class="card-icon"><i class="bi bi-person-gear"></i></div>
-            <h5 class="card-title">Mentor Setup</h5>
-            <p class="card-description">Manage Mentors</p>
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php if (in_array($userRole, ['admin', 'supervisor'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="supervisor_monitoring.php" class="module-card card-monitoring">
-            <div class="card-icon"><i class="bi bi-activity"></i></div>
-            <h5 class="card-title">Supervisor Module</h5>
-            <p class="card-description">Analysis Mentor Performance</p>
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="quidei_payouts.php" class="module-card card-quidei-payout">
-            <div class="card-icon"><i class="bi bi-shield-check"></i></div>
-            <h5 class="card-title">Quidei Payouts</h5>
-            <p class="card-description">Monthly Payout </p>
-        </a>
-    </div>
-    <?php endif; ?>
+        <?php if ($userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="sales_dashboard.php" class="module-card card-sales">
+                <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                <h5 class="card-title">Sales Analytics</h5>
+                <p class="card-description">Performance Tracking</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if ($userRole == 'sales' || $userRole == 'admin'): ?>
 
-    <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
-    <!-- <div class="col-6 col-md-4 col-lg-3">
+
+        <!-- NEW: Student Records Card -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="finalized_students.php" class="module-card card-admissions">
+                <div class="card-icon"><i class="bi bi-mortarboard-fill"></i></div>
+                <h5 class="card-title">Student Records</h5>
+                <p class="card-description">Master Data Management</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if (in_array($userRole, ['demoAdmin', 'demoCordinator', 'admin'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="demos.php" class="module-card card-demos">
+                <div class="card-icon"><i class="bi bi-play-btn-fill"></i></div>
+                <h5 class="card-title">Manage Demo Classes </h5>
+                <p class="card-description">Live Session </p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin', 'demoAdmin'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="all_demos.php" class="module-card card-all-demos">
+                <div class="card-icon"><i class="bi bi-archive-fill"></i></div>
+                <h5 class="card-title">Demo Overview</h5>
+                <p class="card-description">History </p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin', 'demoAdmin', 'demoCordinator'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="demo_payouts.php" class="module-card card-payouts">
+                <div class="card-icon"><i class="bi bi-wallet-fill"></i></div>
+                <h5 class="card-title">Demo Class Payouts</h5>
+                <p class="card-description">Payout for Teachers</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin', 'demoAdmin'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="coordinator_payouts.php" class="module-card card-coord-payouts">
+                <div class="card-icon"><i class="bi bi-people-fill"></i></div>
+                <h5 class="card-title">Demo Coordinates Payouts</h5>
+                <p class="card-description">Payout for Cordinators</p>
+            </a>
+        </div>
+
+        <!-- Link added to the whole container -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="demo_report.php" class="module-card card-reports">
+                <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                <h5 class="card-title">Monthly Analytics</h5>
+                <p class="card-description">Demo Performance Report</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="admissions.php" class="module-card card-admissions">
+                <div class="card-icon"><i class="bi bi-check-circle-fill"></i></div>
+                <h5 class="card-title">Admissions</h5>
+                <p class="card-description">Student Enrollment</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="my_students.php" class="module-card card-mentor">
+                <div class="card-icon"><i class="bi bi-mortarboard-fill"></i></div>
+                <h5 class="card-title">My Students</h5>
+                <p class="card-description">Managed by Mentors</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if ($userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="mentors.php" class="module-card card-mentors-config">
+                <div class="card-icon"><i class="bi bi-person-gear"></i></div>
+                <h5 class="card-title">Mentor Setup</h5>
+                <p class="card-description">Manage Mentors</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if (in_array($userRole, ['admin', 'supervisor'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="supervisor_monitoring.php" class="module-card card-monitoring">
+                <div class="card-icon"><i class="bi bi-activity"></i></div>
+                <h5 class="card-title">Supervisor Module</h5>
+                <p class="card-description">Analysis Mentor Performance</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="quidei_payouts.php" class="module-card card-quidei-payout">
+                <div class="card-icon"><i class="bi bi-shield-check"></i></div>
+                <h5 class="card-title">Quidei Payouts</h5>
+                <p class="card-description">Monthly Payout </p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($userRole == 'mentor' || $userRole == 'admin'): ?>
+        <!-- <div class="col-6 col-md-4 col-lg-3">
         <a href="mentor_payouts.php" class="module-card card-mentor-payouts">
             <div class="card-icon"><i class="bi bi-cash-coin"></i></div>
             <h5 class="card-title">Mentor Payouts</h5>
@@ -654,75 +656,97 @@ body {
             <p class="card-description">Faculty Earnings</p>
         </a>
     </div> -->
-    <?php endif; ?>
+        <?php endif; ?>
 
-    <?php if (in_array($userRole, ['admin', 'accountant'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="student_expense_audit.php" class="module-card card-expense-audit">
-            <div class="card-icon"><i class="bi bi-pie-chart-fill"></i></div>
-            <h5 class="card-title">Expense Audit</h5>
-            <p class="card-description">Student Cost Analysis</p>
+        <?php if (in_array($userRole, ['admin', 'accountant'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="student_expense_audit.php" class="module-card card-expense-audit">
+                <div class="card-icon"><i class="bi bi-pie-chart-fill"></i></div>
+                <h5 class="card-title">Expense Audit</h5>
+                <p class="card-description">Student Cost Analysis</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="users.php" class="module-card card-users">
+                <div class="card-icon"><i class="bi bi-person-badge-fill"></i></div>
+                <h5 class="card-title">User Module</h5>
+                <p class="card-description">Staff Management</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin', 'hrmanager'])): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="user_teachers.php" class="module-card card-teacher-payouts">
+                <div class="card-icon" style="background: linear-gradient(135deg, #198754, #20c997);">
+                    <i class="bi bi-mortarboard-fill"></i>
+                </div>
+                <h5 class="card-title">Teacher Module</h5>
+                <p class="card-description">Faculty & Profiles</p>
+            </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (in_array($userRole, ['admin', 'qualitycontroller', 'supervisor'], true)): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="mentor_activity.php" class="module-card card-monitoring">
+                <div class="card-icon"><i class="bi bi-calendar2-check-fill"></i></div>
+                <h5 class="card-title">Mentor Activity</h5>
+                <p class="card-description">
+                    <?= $userRole === 'supervisor' ? 'Sessions for your assigned mentors' : 'All mentor sessions and attendance' ?>
+                </p>
+            </a>
+        </div>
+
+        <?php endif; ?>
+
+        <?php if ($userRole === 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="subjects.php" class="module-card card-subjects">
+                <div class="card-icon"><i class="bi bi-bookmarks-fill"></i></div>
+                <h5 class="card-title">Subjects Module</h5>
+                <p class="card-description">Manage Subjects</p>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="grades.php" class="module-card card-enquiries">
+                <div class="card-icon" style="background: linear-gradient(135deg, #6366f1, #a855f7);"><i
+                        class="bi bi-layers-fill"></i></div>
+                <h5 class="card-title">Grades/Classes Module</h5>
+                <p class="card-description">Pricing & Classes</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if ($userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="master_export.php" class="module-card"
+                style="--icon-gradient: linear-gradient(135deg, #059669, #10b981); --hover-bg: #10b981;">
+                <div class="card-icon"><i class="bi bi-file-earmark-spreadsheet-fill"></i></div>
+                <h5 class="card-title">Master Export</h5>
+                <p class="card-description">Full 3-Month Schedule Report</p>
+            </a>
+        </div>
+        <?php endif; ?>
+        <?php if ($userRole == 'admin'): ?>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="master_view.php" class="module-card"
+                style="--icon-gradient: linear-gradient(135deg, #0ea5e9, #6366f1); --hover-bg: #6366f1;">
+                <div class="card-icon"><i class="bi bi-table"></i></div>
+                <h5 class="card-title">Master View</h5>
+                <p class="card-description">All data sheet + Excel download</p>
+            </a>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <div class="text-center pb-5">
+        <a href="logout.php" class="dashboard-signout btn btn-outline-danger px-4 rounded-pill fw-bold">
+            <i class="bi bi-power me-2"></i>Sign Out
         </a>
     </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="users.php" class="module-card card-users">
-            <div class="card-icon"><i class="bi bi-person-badge-fill"></i></div>
-            <h5 class="card-title">User Module</h5>
-            <p class="card-description">Staff Management</p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin', 'hrmanager'])): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="user_teachers.php" class="module-card card-teacher-payouts">
-            <div class="card-icon" style="background: linear-gradient(135deg, #198754, #20c997);">
-                <i class="bi bi-mortarboard-fill"></i>
-            </div>
-            <h5 class="card-title">Teacher Module</h5>
-            <p class="card-description">Faculty & Profiles</p>
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <?php if (in_array($userRole, ['admin', 'qualitycontroller', 'supervisor'], true)): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="mentor_activity.php" class="module-card card-monitoring">
-            <div class="card-icon"><i class="bi bi-calendar2-check-fill"></i></div>
-            <h5 class="card-title">Mentor Activity</h5>
-            <p class="card-description"><?= $userRole === 'supervisor' ? 'Sessions for your assigned mentors' : 'All mentor sessions and attendance' ?></p>
-        </a>
-    </div>
-
-    <?php endif; ?>
-
-    <?php if ($userRole === 'admin'): ?>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="subjects.php" class="module-card card-subjects">
-            <div class="card-icon"><i class="bi bi-bookmarks-fill"></i></div>
-            <h5 class="card-title">Subjects Module</h5>
-            <p class="card-description">Manage Subjects</p>
-        </a>
-    </div>
-    <div class="col-6 col-md-4 col-lg-3">
-        <a href="grades.php" class="module-card card-enquiries">
-            <div class="card-icon" style="background: linear-gradient(135deg, #6366f1, #a855f7);"><i
-                    class="bi bi-layers-fill"></i></div>
-            <h5 class="card-title">Grades/Classes Module</h5>
-            <p class="card-description">Pricing & Classes</p>
-        </a>
-    </div>
-    <?php endif; ?>
-</div>
-
-<div class="text-center pb-5">
-    <a href="logout.php" class="dashboard-signout btn btn-outline-danger px-4 rounded-pill fw-bold">
-        <i class="bi bi-power me-2"></i>Sign Out
-    </a>
-</div>
 </main>
 
 <?php include 'includes/footer.php'; ?>

@@ -162,7 +162,7 @@ session_start();
         <div class="container">
             <a class="navbar-brand" href="dashboard.php">
                 <i class="bi bi-mortarboard-fill"></i>
-                <span>QUIDEI EMS</span>
+                <span>QUIDEI</span>
             </a>
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
