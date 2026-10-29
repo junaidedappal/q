@@ -125,6 +125,7 @@ $mentor_name = $mentor['name'] ?? 'Unknown Mentor';
                             <select id="f_fee" class="form-select">
                                 <option value="">All</option>
                                 <option value="Paid">Paid</option>
+                                <option value="Partial">Partial</option>
                                 <option value="Pending">Pending</option>
                             </select>
                         </div>

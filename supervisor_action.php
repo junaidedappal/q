@@ -73,8 +73,12 @@ if ($action === 'get_mentor_students') {
         $paid = floatval($row['paid_hours']);
         if ($total == 0) {
             $row['fee_display'] = '<span class="text-muted small">No Schedule</span>';
+        } elseif ($paid >= $total) {
+            $row['fee_display'] = '<span class="badge bg-success">Paid</span>';
+        } elseif ($paid > 0) {
+            $row['fee_display'] = '<span class="badge bg-warning text-dark">Partial (' . $paid . '/' . $total . ')</span>';
         } else {
-            $row['fee_display'] = ($paid >= $total) ? '<span class="text-success fw-bold">Paid</span>' : '<span class="text-danger fw-bold">Pending</span>';
+            $row['fee_display'] = '<span class="badge bg-danger">Pending</span>';
         }
 
         // 5. SCHEDULE PROGRESS DISPLAY

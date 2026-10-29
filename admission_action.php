@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             // Fetch student details and their LATEST schedule, matching the logic of your dashboard
             $stmt = $conn->prepare('
                 SELECT s.id, s.name, s.mentor_id, s.status,
-                       sch.id as schedule_id, sch.start_date, sch.end_date, sch.total_hours, sch.paid_hours
+                       sch.id as schedule_id, sch.start_date, sch.end_date,                        sch.total_hours, sch.paid_hours, sch.fee_amount
                 FROM students s
                 LEFT JOIN schedules sch ON sch.id = (
                     SELECT id FROM schedules WHERE student_id = s.id ORDER BY start_date DESC, id DESC LIMIT 1
@@ -161,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 2. Handle Integer Inputs (Default to 0)
             $total_hours = floatval($_POST['total_hours']);
             $paid_hours = floatval($_POST['paid_hours']);
+            $fee_amount = max(0, floatval($_POST['fee_amount'] ?? 0));
             $status = !empty($_POST['status']) ? $_POST['status'] : 'ready';
 
             // 3. Validation
@@ -181,14 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $e = $conn->query("SELECT * FROM enquiries WHERE id=$enquiry_id")->fetch_assoc();
 
                 // Insert Student (Allowed NULL mentor_id)
-                $stmt = $conn->prepare('INSERT INTO students (name, class, syllabus, language, phone, parent_phone, previous_performance, remarks, selected_plan, mentor_id, fee_status, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                $stmt->bind_param('sssssssssiss', $e['student_name'], $e['class'], $e['syllabus'], $e['language'], $e['phone'], $e['parent_phone'], $e['previous_performance'], $e['remarks'], $e['selected_plan'], $mentor_id, $fee_status_enum, $status);
+                $stmt = $conn->prepare('INSERT INTO students                 (name, class, syllabus, language, country, phone, parent_phone, previous_performance, remarks, selected_plan, mentor_id, fee_status, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                                $stmt->bind_param('ssssssssssiss', $e['student_name'], $e['class'], $e['syllabus'], $e['language'], $e['country'], $e['phone'], $e['parent_phone'], $e['previous_performance'], $e['remarks'], $e['selected_plan'], $mentor_id, $fee_status_enum, $status);
                 $stmt->execute();
                 $student_id = $conn->insert_id;
 
                 // Insert Schedule (Allowed NULL dates)
-                $sch_stmt = $conn->prepare("INSERT INTO schedules (student_id, mentor_id, total_hours, paid_hours, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
-                $sch_stmt->bind_param('iiddss', $student_id, $mentor_id, $total_hours, $paid_hours, $start_date, $end_date);
+                $sch_stmt = $conn->prepare("INSERT INTO schedules (student_id, mentor_id, total_hours,                 paid_hours, fee_amount, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
+                                $sch_stmt->bind_param('iidddss', $student_id, $mentor_id, $total_hours, $paid_hours, $fee_amount, $start_date, $end_date);
                 $sch_stmt->execute();
 
                 $conn->query("INSERT INTO admissions (enquiry_id, student_id, approved_by, approved_at) VALUES ($enquiry_id, $student_id, {$_SESSION['id']}, NOW())");
@@ -217,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = $_POST['status'];
             $total_hours = floatval($_POST['total_hours']);
             $paid_hours = floatval($_POST['paid_hours']);
+            $fee_amount = max(0, floatval($_POST['fee_amount'] ?? 0));
 
             // 2. VALIDATION (Only check if hours are entered)
             if ($total_hours > 0 && $paid_hours > $total_hours) {
@@ -243,14 +245,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // UPDATE OR INSERT SCHEDULE
                 if ($sch_id > 0) {
                     // Update existing schedule
-                    $stmt2 = $conn->prepare('UPDATE schedules SET mentor_id=?, start_date=?, end_date=?, total_hours=?, paid_hours=? WHERE id=?');
-                    $stmt2->bind_param('issddi', $mentor_id, $start, $end, $total_hours, $paid_hours, $sch_id);
+                    $stmt2 = $conn->prepare('UPDATE schedules SET mentor_id=?, start_date=?, end_date=?,                     total_hours=?, paid_hours=?, fee_amount=? WHERE id=?');
+                                        $stmt2->bind_param('issdddi', $mentor_id, $start, $end, $total_hours, $paid_hours, $fee_amount, $sch_id);
                     $stmt2->execute();
                 } else {
                     // Create new schedule (Only if at least Total Hours are provided, even if dates are null)
                     // If everything is empty, we might skip creating a schedule, but here we create it so we can track the Fee.
-                    $stmt3 = $conn->prepare("INSERT INTO schedules (student_id, mentor_id, start_date, end_date, total_hours, paid_hours, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
-                    $stmt3->bind_param('iissdd', $sid, $mentor_id, $start, $end, $total_hours, $paid_hours);
+                    $stmt3 = $conn->prepare("INSERT INTO schedules (student_id, mentor_id, start_date, end_date,                     total_hours, paid_hours, fee_amount, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
+                                        $stmt3->bind_param('iissddd', $sid, $mentor_id, $start, $end, $total_hours, $paid_hours, $fee_amount);
                     $stmt3->execute();
                 }
 

@@ -955,23 +955,42 @@ $(document).ready(function() {
     });
 
     // Form Submission Handler
+    let isSubmittingEnquiry = false;
+    const saveButton = $('#saveBtn');
+    const saveButtonHtml = saveButton.html();
+
     $('#enquiryForm').on('submit', function(e) {
         e.preventDefault();
-        $.post('enquiry_action.php', $(this).serialize(), function(response) {
-            if (response.status === 'success') {
-                $('#enquiryModal').modal('hide');
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Success!',
-                    text: response.message,
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                table.ajax.reload();
-            } else {
-                Swal.fire('Error!', response.message, 'error');
-            }
-        }, 'json');
+        if (isSubmittingEnquiry) return;
+
+        isSubmittingEnquiry = true;
+        saveButton.prop('disabled', true).html(
+            '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...'
+        );
+
+        $.post('enquiry_action.php', $(this).serialize(), null, 'json')
+            .done(function(response) {
+                if (response.status === 'success') {
+                    $('#enquiryModal').modal('hide');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    table.ajax.reload();
+                } else {
+                    Swal.fire('Error!', response.message, 'error');
+                }
+            })
+            .fail(function() {
+                Swal.fire('Error!', 'Unable to save the enquiry. Please try again.', 'error');
+            })
+            .always(function() {
+                isSubmittingEnquiry = false;
+                saveButton.prop('disabled', false).html(saveButtonHtml);
+            });
     });
 });
 </script>

@@ -33,8 +33,12 @@ if (is_string($yearInput) && preg_match('/^[0-9]{4}$/D', $yearInput) === 1 && in
     $year = $years[0];
 }
 
+$scheduleFilterInput = $_GET['schedule_filter'] ?? '';
+$scheduleFilter = in_array($scheduleFilterInput, ['new_needed', 'new_admission'], true)
+    ? $scheduleFilterInput
+    : 'all';
 $students = [];
-$totals = ['fee' => 0.0, 'salary' => 0.0, 'mentor' => 0.0, 'balance' => 0.0, 'paid' => 0.0, 'total_hours' => 0.0, 'completed' => 0.0];
+$totals = ['fee' => 0.0, 'salary' => 0.0, 'mentor' => 0.0, 'payout' => 0.0, 'balance' => 0.0, 'paid' => 0.0, 'total_hours' => 0.0, 'completed' => 0.0];
 
 if ($year !== null) {
     $start = sprintf('%04d-01-01', $year);
@@ -43,13 +47,17 @@ if ($year !== null) {
     $stmt = $conn->prepare(
         "SELECT
             s.id AS student_id, s.name, s.status, s.fee_status, s.syllabus, s.class,
-            s.language, s.phone, s.parent_phone,
+            s.language, s.country, s.phone, s.parent_phone,
             COALESCE(u.name, '') AS mentor_name,
             COALESCE(sup.name, '') AS supervisor_name,
             COALESCE(m.rate_per_session, 0) AS rate_per_session,
             COALESCE(m.rate_per_exam, 0) AS rate_per_exam,
             COALESCE(attendance_totals.absent_count, 0) AS absent_count,
-            sch.id AS schedule_id, sch.start_date, sch.end_date, sch.paid_hours,
+            sch.id AS schedule_id,
+            CASE WHEN sch.id = (
+                SELECT MIN(first_sch.id) FROM schedules first_sch WHERE first_sch.student_id = s.id
+            ) THEN 1 ELSE 0 END AS is_first_schedule,
+            sch.start_date, sch.end_date, sch.paid_hours,
             sch.total_hours, sch.fee_amount,
             COALESCE(session_totals.completed_hours, 0) AS completed_hours,
             COALESCE(session_totals.teacher_salary, 0) AS teacher_salary,
@@ -100,6 +108,16 @@ if ($year !== null) {
     $rows = $stmt->get_result();
 
     while ($rec = $rows->fetch_assoc()) {
+        $paidHours = (float) ($rec['paid_hours'] ?? 0);
+        $completedHours = (float) $rec['completed_hours'];
+        if ($scheduleFilter === 'new_needed' && ($paidHours <= 0 || abs($paidHours - $completedHours) > 0.00001)) {
+            continue;
+        }
+        if ($scheduleFilter === 'new_admission'
+            && ((int) $rec['is_first_schedule'] !== 1 || abs($completedHours) > 0.00001)) {
+            continue;
+        }
+
         $sid = (int) $rec['student_id'];
         if (!isset($students[$sid])) {
             $students[$sid] = ['info' => $rec, 'schedules' => []];
@@ -113,16 +131,18 @@ if ($year !== null) {
         $fee = (float) ($rec['fee_amount'] ?? 0);
         $sched = [
             'start' => $rec['start_date'], 'end' => $rec['end_date'],
-            'paid' => (float) ($rec['paid_hours'] ?? 0),
+            'paid' => $paidHours,
             'total' => (float) ($rec['total_hours'] ?? 0),
-            'completed' => (float) $rec['completed_hours'],
+            'completed' => $completedHours,
             'fee' => $fee, 'salary' => $salary, 'mentor' => $mentorFee,
+            'payout' => $salary + $mentorFee,
             'balance' => $fee - ($salary + $mentorFee),
         ];
         $students[$sid]['schedules'][] = $sched;
         $totals['fee'] += $fee;
         $totals['salary'] += $salary;
         $totals['mentor'] += $mentorFee;
+        $totals['payout'] += $sched['payout'];
         $totals['balance'] += $sched['balance'];
         $totals['paid'] += $sched['paid'];
         $totals['total_hours'] += $sched['total'];
@@ -132,12 +152,12 @@ if ($year !== null) {
 }
 
 $headers = [
-    'SI NO', 'STUDENT NAME', 'STATUS', 'ACADEMIC MENTOR', 'SUPERVISOR', 'FEE STATUS', 'ABSENT',
+    'SI NO', 'STUDENT NAME', 'COUNTRY', 'STATUS', 'ACADEMIC MENTOR', 'SUPERVISOR', 'FEE STATUS', 'COMPLETED HRS', 'ABSENT',
     'SYLLABUS', 'GRADE', 'LANGUAGE', 'STUDENT PHONE', 'PARENT PHONE',
-    'SCHEDULE', 'START', 'END', 'PAID HRS', 'TOTAL HRS', 'COMPLETED HRS',
-    'FEE', 'TEACHER SALARY', 'MENTOR FEE', 'BALANCE',
+    'SCHEDULE', 'START', 'END', 'PAID HRS', 'TOTAL HRS',
+    'FEE AMOUNT (₹)', 'TEACHER SALARY (₹)', 'MENTOR FEE (₹)', 'TOTAL PAYOUT (₹)', 'BALANCE-PROFIT (₹)',
 ];
-$numericCols = [6, 15, 16, 17, 18, 19, 20, 21];
+$numericCols = [7, 8, 17, 18, 19, 20, 21, 22, 23];
 
 // Yields table rows as arrays of cells; student columns only on a student's first row.
 function mv_rows(array $students): Generator
@@ -147,19 +167,20 @@ function mv_rows(array $students): Generator
         $n++;
         $i = $st['info'];
         $studentCells = [
-            $n, $i['name'], $i['status'], $i['mentor_name'], $i['supervisor_name'], $i['fee_status'],
+            $n, $i['name'], $i['country'], $i['status'], $i['mentor_name'], $i['supervisor_name'], $i['fee_status'],
             (int) $i['absent_count'], $i['syllabus'], $i['class'], $i['language'], $i['phone'], $i['parent_phone'],
         ];
         $scheds = $st['schedules'] ?: [null];
         foreach ($scheds as $k => $s) {
-            $cells = $k === 0 ? $studentCells : array_fill(0, 12, '');
+            $cells = $k === 0 ? array_slice($studentCells, 0, 7) : array_fill(0, 7, '');
+            $cells[] = $s === null ? '' : $s['completed'];
+            $cells = array_merge($cells, $k === 0 ? array_slice($studentCells, 7) : array_fill(0, 6, ''));
             if ($s === null) {
                 $cells = array_merge($cells, array_fill(0, 10, ''));
             } else {
                 array_push(
                     $cells, $k + 1, $s['start'], $s['end'],
-                    $s['paid'], $s['total'], $s['completed'],
-                    $s['fee'], $s['salary'], $s['mentor'], $s['balance']
+                    $s['paid'], $s['total'], $s['fee'], $s['salary'], $s['mentor'], $s['payout'], $s['balance']
                 );
             }
             yield [$k === 0, $cells];
@@ -167,10 +188,10 @@ function mv_rows(array $students): Generator
     }
 }
 
-function mv_cell($v, bool $numeric): string
+function mv_cell($v, bool $numeric, bool $currency = false): string
 {
     if ($numeric && $v !== '' && $v !== null) {
-        return number_format((float) $v, is_int($v) ? 0 : 2);
+        return ($currency ? '₹ ' : '') . number_format((float) $v, is_int($v) ? 0 : 2);
     }
     return mv_h($v);
 }
@@ -219,8 +240,10 @@ if ($year !== null && ($_GET['download'] ?? '') === '1') {
         }
         echo '</tr>';
     }
-    echo '<tr class="tot"><td colspan="15" style="text-align:right">TOTAL</td>';
-    foreach (['paid', 'total_hours', 'completed', 'fee', 'salary', 'mentor', 'balance'] as $k) {
+    echo '<tr class="tot"><td colspan="7" style="text-align:right">TOTAL</td>';
+    echo '<td class="num">' . number_format($totals['completed'], 2, '.', '') . '</td>';
+    echo '<td colspan="9"></td>';
+    foreach (['paid', 'total_hours', 'fee', 'salary', 'mentor', 'payout', 'balance'] as $k) {
         echo '<td class="num">' . number_format($totals[$k], 2, '.', '') . '</td>';
     }
     echo '</tr></table></body></html>';
@@ -231,90 +254,251 @@ ob_end_flush();
 ?>
 
 <style>
-.mv-hero { background: linear-gradient(120deg, #064e3b 0%, #059669 55%, #34d399 100%); border-radius: 1.25rem; }
-.mv-stat { border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; padding: 1rem 1.25rem; height: 100%; }
-.mv-stat .label { color: #64748b; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.mv-stat .value { color: #0f172a; font-size: 1.35rem; font-weight: 800; }
-.mv-wrap { max-height: 70vh; overflow: auto; border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; }
-.mv-table { border-collapse: separate; border-spacing: 0; font-size: .85rem; margin: 0; min-width: 1900px; width: 100%; }
-.mv-table th { background: #064e3b; color: #fff; font-size: .72rem; letter-spacing: .04em; padding: .65rem .6rem; position: sticky; top: 0; white-space: nowrap; z-index: 3; }
-.mv-table td { border-bottom: 1px solid #f1f5f9; padding: .5rem .6rem; white-space: nowrap; }
-.mv-table tr.first td { background: #f0fdf4; border-top: 2px solid #10b981; }
-.mv-table tbody tr:hover td { background: #ecfeff; }
-.mv-table .num { font-variant-numeric: tabular-nums; text-align: right; }
-.mv-table th:nth-child(2), .mv-table td:nth-child(2) { left: 0; position: sticky; z-index: 2; background: inherit; box-shadow: 1px 0 0 #e2e8f0; }
-.mv-table th:nth-child(2) { z-index: 4; background: #064e3b; }
-.mv-table tbody td:nth-child(2) { background: #fff; font-weight: 600; }
-.mv-table tbody tr.first td:nth-child(2) { background: #f0fdf4; }
-.mv-table tfoot td { background: #064e3b !important; bottom: 0; color: #fff; font-weight: 700; left: auto !important; position: sticky; z-index: 2; box-shadow: none !important; }
-.neg { color: #dc2626; font-weight: 700; }
-.pos { color: #059669; font-weight: 700; }
-@media (max-width: 575.98px) { .mv-hero { padding: 1.5rem !important; } .mv-stat .value { font-size: 1.1rem; } }
+.mv-hero {
+    background: linear-gradient(120deg, #064e3b 0%, #059669 55%, #34d399 100%);
+    border-radius: 1.25rem;
+}
+
+.mv-stat {
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #fff;
+    padding: 1rem 1.25rem;
+    height: 100%;
+}
+
+.mv-stat .label {
+    color: #64748b;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.mv-stat .value {
+    color: #0f172a;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.mv-wrap {
+    max-height: 70vh;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #fff;
+}
+
+.mv-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .85rem;
+    margin: 0;
+    min-width: 1900px;
+    width: 100%;
+}
+
+.mv-table th {
+    background: #064e3b;
+    color: #fff;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    padding: .65rem .6rem;
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+    z-index: 3;
+}
+
+.mv-table td {
+    border-bottom: 1px solid #f1f5f9;
+    padding: .5rem .6rem;
+    white-space: nowrap;
+}
+
+.mv-table tr.first td {
+    background: #f0fdf4;
+    border-top: 2px solid #10b981;
+}
+
+.mv-table tbody tr:hover td {
+    background: #ecfeff;
+}
+
+.mv-table .num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.mv-table th:nth-child(2),
+.mv-table td:nth-child(2) {
+    left: 0;
+    position: sticky;
+    z-index: 2;
+    background: inherit;
+    box-shadow: 1px 0 0 #e2e8f0;
+}
+
+.mv-table th:nth-child(2) {
+    z-index: 4;
+    background: #064e3b;
+}
+
+.mv-table tbody td:nth-child(2) {
+    background: #fff;
+    font-weight: 600;
+}
+
+.mv-table tbody tr.first td:nth-child(2) {
+    background: #f0fdf4;
+}
+
+.mv-table tfoot td {
+    background: #064e3b !important;
+    bottom: 0;
+    color: #fff;
+    font-weight: 700;
+    left: auto !important;
+    position: sticky;
+    z-index: 2;
+    box-shadow: none !important;
+}
+
+.neg {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.pos {
+    color: #059669;
+    font-weight: 700;
+}
+
+@media (max-width: 575.98px) {
+    .mv-hero {
+        padding: 1.5rem !important;
+    }
+
+    .mv-stat .value {
+        font-size: 1.1rem;
+    }
+}
 </style>
 
 <main class="container-fluid px-3 px-lg-4 py-4">
     <section class="mv-hero text-white p-4 p-lg-5 mb-4 shadow-sm">
         <span class="badge rounded-pill bg-white bg-opacity-25 text-white mb-3">ADMIN ONLY</span>
         <h1 class="h2 fw-bold mb-2">Master View</h1>
-        <p class="mb-0 text-white-50">All student, schedule and payout data in one organised sheet, with Excel download.</p>
+        <p class="mb-0 text-white-50">All student, schedule and payout data in one organised sheet, with Excel download.
+        </p>
     </section>
 
     <form method="GET" class="row g-2 align-items-end mb-4">
         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
             <label for="mv-year" class="form-label fw-semibold">Academic year</label>
-            <select id="mv-year" name="year" class="form-select" onchange="this.form.submit()" <?= $years ? '' : 'disabled' ?>>
+            <select id="mv-year" name="year" class="form-select" onchange="this.form.submit()"
+                <?= $years ? '' : 'disabled' ?>>
                 <?php foreach ($years as $y): ?>
-                    <option value="<?= $y ?>" <?= $y === $year ? 'selected' : '' ?>><?= $y ?>–<?= $y + 1 ?></option>
+                <option value="<?= $y ?>" <?= $y === $year ? 'selected' : '' ?>><?= $y ?>–<?= $y + 1 ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+            <label for="mv-schedule-filter" class="form-label fw-semibold">Schedule filter</label>
+            <select id="mv-schedule-filter" name="schedule_filter" class="form-select" onchange="this.form.submit()">
+                <option value="all" <?= $scheduleFilter === 'all' ? 'selected' : '' ?>>All schedules</option>
+                <option value="new_needed" <?= $scheduleFilter === 'new_needed' ? 'selected' : '' ?>>New schedule needed
+                </option>
+                <option value="new_admission" <?= $scheduleFilter === 'new_admission' ? 'selected' : '' ?>>New admission
+                </option>
             </select>
         </div>
         <div class="col-12 col-sm-6 col-md-auto">
             <?php if ($year !== null): ?>
-                <a class="btn btn-success fw-semibold w-100" href="master_view.php?year=<?= $year ?>&amp;download=1">
-                    <i class="bi bi-file-earmark-excel me-2" aria-hidden="true"></i>Download Excel
-                </a>
+            <a class="btn btn-success fw-semibold w-100"
+                href="master_view.php?year=<?= $year ?>&amp;schedule_filter=<?= urlencode($scheduleFilter) ?>&amp;download=1">
+                <i class="bi bi-file-earmark-excel me-2" aria-hidden="true"></i>Download Excel
+            </a>
             <?php endif; ?>
         </div>
     </form>
 
     <?php if ($year === null || !$students): ?>
-        <div class="alert alert-info">No student records available for this year.</div>
+    <div class="alert alert-info">
+        <?php if ($scheduleFilter === 'new_needed'): ?>
+        No schedules match the New schedule needed filter for this year.
+        <?php elseif ($scheduleFilter === 'new_admission'): ?>
+        No first schedules with zero completed hours were found for this year.
+        <?php else: ?>
+        No student records available for this year.
+        <?php endif; ?>
+    </div>
     <?php else: ?>
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-lg-3"><div class="mv-stat"><div class="label">Students</div><div class="value"><?= count($students) ?></div></div></div>
-            <div class="col-6 col-lg-3"><div class="mv-stat"><div class="label">Total fee</div><div class="value"><?= number_format($totals['fee'], 2) ?></div></div></div>
-            <div class="col-6 col-lg-3"><div class="mv-stat"><div class="label">Teacher + mentor payout</div><div class="value"><?= number_format($totals['salary'] + $totals['mentor'], 2) ?></div></div></div>
-            <div class="col-6 col-lg-3"><div class="mv-stat"><div class="label">Balance</div><div class="value <?= $totals['balance'] < 0 ? 'neg' : 'pos' ?>"><?= number_format($totals['balance'], 2) ?></div></div></div>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="mv-stat">
+                <div class="label">Students</div>
+                <div class="value"><?= count($students) ?></div>
+            </div>
         </div>
+        <div class="col-6 col-lg-3">
+            <div class="mv-stat">
+                <div class="label">Total fee</div>
+                <div class="value">₹ <?= number_format($totals['fee'], 2) ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="mv-stat">
+                <div class="label">Teacher + mentor payout</div>
+                <div class="value">₹ <?= number_format($totals['salary'] + $totals['mentor'], 2) ?></div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="mv-stat">
+                <div class="label">Balance</div>
+                <div class="value <?= $totals['balance'] < 0 ? 'neg' : 'pos' ?>">₹
+                    <?= number_format($totals['balance'], 2) ?></div>
+            </div>
+        </div>
+    </div>
 
-        <div class="mv-wrap shadow-sm">
-            <table class="table mv-table">
-                <thead><tr>
+    <div class="mv-wrap shadow-sm">
+        <table class="table mv-table">
+            <thead>
+                <tr>
                     <?php foreach ($headers as $h): ?><th><?= mv_h($h) ?></th><?php endforeach; ?>
-                </tr></thead>
-                <tbody>
+                </tr>
+            </thead>
+            <tbody>
                 <?php foreach (mv_rows($students) as [$first, $cells]): ?>
-                    <tr class="<?= $first ? 'first' : '' ?>">
-                        <?php foreach ($cells as $idx => $v):
+                <tr class="<?= $first ? 'first' : '' ?>">
+                    <?php foreach ($cells as $idx => $v):
                             $isNum = in_array($idx, $numericCols, true);
                             $cls = $isNum ? 'num' : '';
-                            if ($idx === 21 && $v !== '') {
+                            if ($idx === 23 && $v !== '') {
                                 $cls .= $v < 0 ? ' neg' : ' pos';
                             } ?>
-                            <td class="<?= $cls ?>"><?= mv_cell($v, $isNum) ?></td>
-                        <?php endforeach; ?>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-                <tfoot><tr>
-                    <td colspan="15" class="text-end">TOTAL</td>
-                    <?php foreach (['paid', 'total_hours', 'completed', 'fee', 'salary', 'mentor', 'balance'] as $k): ?>
-                        <td class="num"><?= number_format($totals[$k], 2) ?></td>
+                    <td class="<?= $cls ?>"><?= mv_cell($v, $isNum, $isNum && $idx >= 19) ?></td>
                     <?php endforeach; ?>
-                </tr></tfoot>
-            </table>
-        </div>
-        <p class="form-text mt-2">Student details appear on the first row of each student; enquiries are excluded. Scroll sideways on small screens.</p>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="7" class="text-end">TOTAL</td>
+                    <td class="num"><?= number_format($totals['completed'], 2) ?></td>
+                    <td colspan="9"></td>
+                    <?php foreach (['paid', 'total_hours', 'fee', 'salary', 'mentor', 'payout', 'balance'] as $k): ?>
+                    <td class="num">
+                        <?= in_array($k, ['fee', 'salary', 'mentor', 'balance'], true) ? '₹ ' : '' ?><?= number_format($totals[$k], 2) ?>
+                    </td>
+                    <?php endforeach; ?>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="form-text mt-2">Student details appear on the first row of each student; enquiries are excluded. Scroll
+        sideways on small screens.</p>
     <?php endif; ?>
 </main>
 

@@ -274,6 +274,11 @@ ob_end_flush();
                             <input type="number" class="form-control" name="paid_hours" placeholder="0.00" step="0.01"
                                 min="0">
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold">Fee Amount (₹)</label>
+                            <input type="number" class="form-control" name="fee_amount" placeholder="0.00" step="0.01"
+                                min="0">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -324,6 +329,11 @@ ob_end_flush();
                             <label class="form-label small fw-bold text-success">Paid Hours</label>
                             <input type="number" class="form-control" name="paid_hours" placeholder="0.00" step="0.01"
                                 min="0" id="edit_paid_hours">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold">Fee Amount (₹)</label>
+                            <input type="number" class="form-control" name="fee_amount" placeholder="0.00" step="0.01"
+                                min="0" id="edit_fee_amount">
                         </div>
 
                         <div class="col-md-12">
@@ -618,6 +628,7 @@ $(document).ready(function() {
                 // New Paid Logic
                 $('#edit_total_hours').val(d.total_hours);
                 $('#edit_paid_hours').val(d.paid_hours); // Load Paid Hours
+                $('#edit_fee_amount').val(d.fee_amount);
 
                 loadMentors('#edit_mentor_select', d.mentor_id);
                 $('#editStudentModal').modal('show');
