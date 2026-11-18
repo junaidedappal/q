@@ -3,6 +3,7 @@ session_start();
 ob_start();
 header('Content-Type: application/json');
 require 'includes/db.php';
+require_once 'includes/attendance_window.php';
 
 // Authorization Check: Only 'mentor' and 'admin' can access
 if (!isset($_SESSION['loggedin']) || !in_array($_SESSION['role'], ['admin', 'mentor', 'supervisor'])) {
@@ -85,20 +86,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             $data['schedules'] = $schedules;
 
-            $demo_stmt = $conn->prepare('
-            SELECT md.*, s.name as subject_name, u.name as teacher_name 
-            FROM mentor_demos md
-            JOIN subjects s ON md.subject_id = s.id
-            JOIN teachers t ON md.teacher_id = t.id
-            JOIN users u ON t.user_id = u.id
-            WHERE md.student_id = ? 
-            ORDER BY md.demo_date DESC
-        ');
-            $demo_stmt->bind_param('i', $student_id);
-            $demo_stmt->execute();
-            $data['mentor_demos'] = $demo_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            // Demos are loaded separately so a demo problem never blocks the schedules.
+            $warning = null;
+            try {
+                $demo_stmt = $conn->prepare('
+                SELECT md.*, s.name as subject_name, u.name as teacher_name,
+                       COALESCE(md.teacher_pay, g.payment_per_hour, 0) as effective_pay
+                FROM mentor_demos md
+                JOIN subjects s ON md.subject_id = s.id
+                JOIN teachers t ON md.teacher_id = t.id
+                JOIN users u ON t.user_id = u.id
+                LEFT JOIN students stu ON stu.id = md.student_id
+                LEFT JOIN grades g ON g.grade_name = stu.class
+                WHERE md.student_id = ?
+                ORDER BY md.demo_date DESC
+            ');
+                if (!$demo_stmt) {
+                    throw new Exception($conn->error);
+                }
+                $demo_stmt->bind_param('i', $student_id);
+                $demo_stmt->execute();
+                $data['mentor_demos'] = $demo_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            } catch (Throwable $e) {
+                error_log('Student schedule demo query failed: ' . $e->getMessage());
+                $data['mentor_demos'] = [];
+                $warning = 'Independent demos could not be loaded: ' . $e->getMessage();
+            }
 
-            echo json_encode(['status' => 'success', 'data' => $data]);
+            ob_clean();
+            echo json_encode(['status' => 'success', 'data' => $data, 'warning' => $warning]);
             break;
 
         case 'get_default_pay':
@@ -476,13 +492,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subject_id = intval($_POST['subject_id']);
             $demo_date = $_POST['demo_date'];
             $duration = floatval($_POST['duration_hours']);
+            // Teacher wage per hour for this demo; empty = use the grade rate.
+            $demo_pay = (isset($_POST['teacher_pay']) && $_POST['teacher_pay'] !== '') ? floatval($_POST['teacher_pay']) : null;
+            if ($demo_pay !== null && $demo_pay < 0) {
+                echo json_encode(['status' => 'error', 'message' => 'Teacher wage cannot be negative.']);
+                exit;
+            }
 
             // We set default outcome as 'interested' and empty feedback as per your simplified request
             $outcome = 'interested';
             $feedback = 'Independent Mentor Demo';
 
-            $stmt = $conn->prepare('INSERT INTO mentor_demos (student_id, teacher_id, subject_id, demo_date, duration_hours, outcome, feedback) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            $stmt->bind_param('iiisdss', $student_id, $teacher_id, $subject_id, $demo_date, $duration, $outcome, $feedback);
+            $stmt = $conn->prepare('INSERT INTO mentor_demos (student_id, teacher_id, subject_id, demo_date, duration_hours, teacher_pay, outcome, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt->bind_param('iiisddss', $student_id, $teacher_id, $subject_id, $demo_date, $duration, $demo_pay, $outcome, $feedback);
 
             if ($stmt->execute()) {
                 echo json_encode(['status' => 'success', 'message' => 'Demo recorded successfully.']);
@@ -498,8 +520,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['status' => 'error', 'message' => 'Only Admin can edit demo records.']);
                 exit;
             }
-            $stmt = $conn->prepare("UPDATE mentor_demos SET subject_id=?, teacher_id=?, demo_date=?, duration_hours=? WHERE id=?");
-            $stmt->bind_param("iisdi", $_POST['subject_id'], $_POST['teacher_id'], $_POST['demo_date'], $_POST['duration_hours'], $_POST['demo_id']);
+            $edit_demo_pay = (isset($_POST['teacher_pay']) && $_POST['teacher_pay'] !== '') ? floatval($_POST['teacher_pay']) : null;
+            if ($edit_demo_pay !== null && $edit_demo_pay < 0) {
+                ob_clean();
+                echo json_encode(['status' => 'error', 'message' => 'Teacher wage cannot be negative.']);
+                exit;
+            }
+            $stmt = $conn->prepare("UPDATE mentor_demos SET subject_id=?, teacher_id=?, demo_date=?, duration_hours=?, teacher_pay=? WHERE id=?");
+            $stmt->bind_param("iisddi", $_POST['subject_id'], $_POST['teacher_id'], $_POST['demo_date'], $_POST['duration_hours'], $edit_demo_pay, $_POST['demo_id']);
             
             ob_clean();
             echo json_encode($stmt->execute() ? ['status' => 'success', 'message' => 'Demo updated!'] : ['status' => 'error']);
@@ -686,13 +714,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $date_query->execute();
                 $sess_date = $date_query->get_result()->fetch_assoc()['date'];
 
-                $current_month = date('Y-m');
+                // Previous month stays open during the first day(s) of the new month.
+                $open_from_month = attendance_open_from_month();
                 $session_month = date('Y-m', strtotime($sess_date));
 
-                if ($session_month < $current_month) {
+                if ($session_month < $open_from_month) {
                     echo json_encode([
                         'status' => 'error',
-                        'message' => 'Access Denied: Attendance for previous months is locked because accounts have been cleared. Contact Admin for changes.'
+                        'message' => 'Access Denied: Attendance for previous months is locked because accounts have been cleared. Previous month attendance can only be marked on the 1st day of the new month. Contact Admin for changes.'
                     ]);
                     exit;
                 }

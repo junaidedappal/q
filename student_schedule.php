@@ -3,6 +3,7 @@ ob_start();
 // student_schedule.php
 include 'includes/header.php';
 require 'includes/db.php';
+require_once 'includes/attendance_window.php';
 
 // Security Checks
 if (!isset($_SESSION['loggedin']) || !in_array($_SESSION['role'], ['admin', 'mentor', 'supervisor'])) {
@@ -32,6 +33,12 @@ if (!$student_info) {
 }
 // Store the mentor ID for the supervisor's back button
 $assigned_mentor_id = $student_info['mentor_id'];
+
+// Default teacher wage per hour for demos (from the student's grade)
+$grade_pay_stmt = $conn->prepare('SELECT payment_per_hour FROM grades WHERE grade_name = ? LIMIT 1');
+$grade_pay_stmt->bind_param('s', $student_info['class']);
+$grade_pay_stmt->execute();
+$defaultDemoPay = (float) ($grade_pay_stmt->get_result()->fetch_assoc()['payment_per_hour'] ?? 0);
 ?>
 
 <!-- Flatpickr for Multiple Dates -->
@@ -560,8 +567,17 @@ body {
                         </div>
                         <div class="col-6">
                             <label class="small fw-bold text-primary">Duration (Hours)</label>
-                            <input type="number" name="duration_hours" class="form-control" step="0.05" min="0"
-                                value="1" required>
+                            <input type="number" name="duration_hours" id="demo_duration_hours" class="form-control"
+                                step="0.05" min="0" value="1" required>
+                        </div>
+                        <div class="col-12">
+                            <label for="demo_teacher_pay" class="small fw-bold text-danger">Teacher Wage per Hour
+                                (₹)</label>
+                            <input type="number" name="teacher_pay" id="demo_teacher_pay" class="form-control"
+                                step="0.01" min="0" required>
+                            <div class="form-text small">
+                                Pre-filled from the grade rate. Total wage: <b>₹ <span id="demo_total_pay">0.00</span></b>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -569,6 +585,42 @@ body {
                     <button type="submit" class="btn btn-warning w-100 fw-bold py-2">Save Demo Session</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Schedule Status Modal -->
+<div class="modal fade" id="whatsappModal" tabindex="-1" aria-labelledby="whatsappModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background:#128c7e;">
+                <h5 class="modal-title fw-bold" id="whatsappModalTitle">
+                    <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>Share Schedule to WhatsApp
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="waTimesSection" class="mb-3">
+                    <div class="small fw-bold text-muted text-uppercase mb-2">Class times (IST)</div>
+                    <div id="waTimes" class="row g-2"></div>
+                    <div class="form-text small">Times are remembered for this schedule on this device.</div>
+                </div>
+                <label for="waPreview" class="small fw-bold text-muted text-uppercase mb-1">Message preview</label>
+                <textarea id="waPreview" class="form-control" rows="16"
+                    style="font-size:.9rem; white-space:pre;"></textarea>
+                <div class="form-text small">You can edit the text before copying. Changing a time rebuilds the
+                    preview.</div>
+            </div>
+            <div class="modal-footer bg-light border-0 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="waOpenBtn" class="btn btn-outline-success" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open WhatsApp
+                </a>
+                <button type="button" id="waCopyBtn" class="btn btn-success fw-bold px-4">
+                    <i class="bi bi-clipboard me-1" aria-hidden="true"></i>Copy Text
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -604,6 +656,11 @@ body {
                             <input type="number" name="duration_hours" id="edit_demo_duration" class="form-control"
                                 step="0.05" min="0" required>
                         </div>
+                        <div class="col-12">
+                            <label for="edit_demo_teacher_pay" class="small fw-bold">Teacher Wage per Hour (₹)</label>
+                            <input type="number" name="teacher_pay" id="edit_demo_teacher_pay" class="form-control"
+                                step="0.01" min="0" required>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -624,7 +681,13 @@ $(document).ready(function() {
     // 1. Core Variables
     const userRole = "<?php echo $_SESSION['role']; ?>";
     const studentId = <?php echo $student_id; ?>;
+    // Earliest month (YYYY-MM) mentors can still mark attendance for (1-day extension).
+    const attendanceOpenFrom = "<?php echo attendance_open_from_month(); ?>";
+    const defaultDemoPay = <?php echo json_encode($defaultDemoPay); ?>;
+    const studentName = <?php echo json_encode((string) $student_info['name']); ?>;
+    const studentClass = <?php echo json_encode((string) $student_info['class']); ?>;
     let teachersAndSubjects = {};
+    let schedulesById = {}; // loaded schedules, used by the WhatsApp share popup
 
     // 2. Persistent Accordion State Key (Unique per student)
     const storageKey = "open_sch_stu_" + studentId;
@@ -656,10 +719,14 @@ $(document).ready(function() {
                     // --- ACCORDION PERSISTENCE LOGIC ---
                     const lastOpenId = localStorage.getItem(storageKey);
 
+                    schedulesById = {};
                     res.data.schedules.forEach(function(sch, index) {
                         let displayTitle = (!sch.name || sch.name === 'null') ?
                             "Schedule " + (
                                 totalSchedules - index) : sch.name;
+                        schedulesById[sch.id] = Object.assign({}, sch, {
+                            displayTitle: displayTitle
+                        });
                         let total = parseFloat(sch.total_hours) || 0;
                         let paid = parseFloat(sch.paid_hours) || 0;
                         let examCount = sch.exams ? sch.exams.length : 0;
@@ -687,11 +754,13 @@ $(document).ready(function() {
                                     currentYear) || (sessDate.getFullYear() ===
                                     currentYear &&
                                     sessDate.getMonth() < currentMonth);
+                                const isAttendanceLocked = String(sess.date || '').substring(0, 7) <
+                                    attendanceOpenFrom;
                                 let actionBtn = '';
                                 if (userRole === 'supervisor') {
                                     actionBtn = `<span
             class="badge bg-light text-dark border small">Read Only</span>`;
-                                } else if (userRole === 'mentor' && isPastMonth &&
+                                } else if (userRole === 'mentor' && isAttendanceLocked &&
                                     sess
                                     .status !== 'planned') {
                                     actionBtn =
@@ -737,11 +806,13 @@ $(document).ready(function() {
                         let toolbarHtml = '';
                         let footerHtml = '';
 
+                        const waBtn = `<button class="btn btn-sm btn-success btn-share-whatsapp" data-id="${sch.id}"
+                    title="Copy schedule status for WhatsApp"><i class="bi bi-whatsapp me-1"></i>WhatsApp</button>`;
                         if (userRole === 'supervisor') {
                             toolbarHtml =
-                                `<div class="w-100 mb-3"><button class="btn btn-sm btn-outline-primary w-100 py-2 btn-manage-exams"
+                                `<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-sm btn-outline-primary flex-grow-1 py-2 btn-manage-exams"
                     data-id="${sch.id}" data-exams='${JSON.stringify(sch.exams || [])}'><i
-                        class="bi bi-award me-2"></i>View Exam Marks (${examCount})</button></div>`;
+                        class="bi bi-award me-2"></i>View Exam Marks (${examCount})</button>${waBtn}</div>`;
                         } else {
                             toolbarHtml = `<div class="d-flex flex-wrap gap-2 mb-3 bg-light p-2 rounded">
                 <button class="btn btn-sm btn-white border btn-edit-schedule" data-id="${sch.id}"><i
@@ -751,6 +822,7 @@ $(document).ready(function() {
                 <button class="btn btn-sm btn-outline-primary btn-manage-exams" data-id="${sch.id}"
                     data-exams='${JSON.stringify(sch.exams || [])}'><i class="bi bi-award me-1"></i>Exams
                     (${examCount})</button>
+                ${waBtn}
             </div>`;
                             footerHtml =
                                 `<div class="card-footer bg-light border-0"><button
@@ -817,11 +889,14 @@ $(document).ready(function() {
             class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0 btn-delete-demo"
         data-id="${d.id}"><i class="bi bi-trash"></i></button>` :
                             '';
+                        const demoRate = parseFloat(d.effective_pay) || 0;
+                        const demoTotal = demoRate * (parseFloat(d.duration_hours) || 0);
                         demoRows +=
                             `<tr>
         <td><b>${d.subject_name}</b><br><small>${d.demo_date}</small></td>
         <td>${d.teacher_name}</td>
         <td class="text-center">${d.duration_hours}</td>
+        <td class="text-end small">₹ ${demoRate.toFixed(2)}/hr<br><b>₹ ${demoTotal.toFixed(2)}</b></td>
         <td class="text-end">${adminDemoBtns}</td>
     </tr>`;
                     });
@@ -837,8 +912,21 @@ $(document).ready(function() {
     </div>`
                     );
                 }
+                if (res.warning) {
+                    $('#demoSessionsContainer').prepend($('<div class="alert alert-warning small">').text(res
+                        .warning));
+                }
+            } else {
+                $('#schedulesContainer').html($('<div class="alert alert-danger">').text(res.message ||
+                    'Could not load schedules.'));
             }
-        }, 'json');
+        }, 'json').fail(function(xhr) {
+            // Show the server's error instead of spinning forever
+            const detail = (xhr.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+                .substring(0, 400);
+            $('#schedulesContainer').html($('<div class="alert alert-danger">').text(
+                'Could not load schedules. ' + (detail || ('HTTP ' + xhr.status))));
+        });
     }
 
     // --- ACCORDION STATE SAVING (Persistent between refreshes/actions) ---
@@ -883,8 +971,18 @@ $(document).ready(function() {
         teachersAndSubjects.subjects.forEach(s => sOpts +=
             `<option value="${s.id}">${s.name}</option>`);
         $('#demo_subject_select').html(sOpts);
+        $('#demo_teacher_pay').val(Number(defaultDemoPay).toFixed(2));
+        updateDemoTotal();
         $('#mentorDemoModal').modal('show');
     });
+
+    // Live total wage = hours x wage per hour
+    function updateDemoTotal() {
+        const hours = parseFloat($('#demo_duration_hours').val()) || 0;
+        const rate = parseFloat($('#demo_teacher_pay').val()) || 0;
+        $('#demo_total_pay').text((hours * rate).toFixed(2));
+    }
+    $('#demo_duration_hours, #demo_teacher_pay').on('input', updateDemoTotal);
 
     $('#mentorDemoForm').on('submit', function(e) {
         e.preventDefault();
@@ -893,6 +991,8 @@ $(document).ready(function() {
                 $('#mentorDemoModal').modal('hide');
                 loadScheduleDetails();
                 Swal.fire('Saved!', 'Demo recorded.', 'success');
+            } else {
+                Swal.fire('Error', res.message || 'Could not save the demo.', 'error');
             }
         }, 'json');
     });
@@ -908,6 +1008,8 @@ $(document).ready(function() {
                 $('#edit_demo_id').val(d.id);
                 $('#edit_demo_date').val(d.demo_date);
                 $('#edit_demo_duration').val(d.duration_hours);
+                $('#edit_demo_teacher_pay').val(d.teacher_pay !== null ? d.teacher_pay : Number(
+                    defaultDemoPay).toFixed(2));
 
                 // Populate dropdowns
                 let tOpts = '';
@@ -940,6 +1042,8 @@ $(document).ready(function() {
             if (res.status === 'success') {
                 $('#editDemoModal').modal('hide');
                 loadScheduleDetails();
+            } else {
+                Swal.fire('Error', res.message || 'Could not update the demo.', 'error');
             }
         }, 'json');
     });
@@ -1235,6 +1339,198 @@ $(document).ready(function() {
             action: 'delete_session',
             session_id: id
         }, () => loadScheduleDetails());
+    });
+
+    // ==========================================================
+    // WHATSAPP SHARE: build the schedule status message for the group
+    // ==========================================================
+    const WA_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const WA_DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    let waCurrentScheduleId = null;
+
+    function waNum(n) {
+        const v = parseFloat(n) || 0;
+        return String(parseFloat(v.toFixed(2)));
+    }
+
+    function waParseDate(ymd) {
+        const p = String(ymd || '').split('-').map(Number);
+        return p.length === 3 && p[0] ? new Date(p[0], p[1] - 1, p[2]) : null;
+    }
+
+    // "19:00" -> "7.00 pm"
+    function waTimeLabel(hhmm) {
+        if (!hhmm) return '__.__';
+        const [h, m] = hhmm.split(':').map(Number);
+        const suffix = h >= 12 ? 'pm' : 'am';
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}.${String(m || 0).padStart(2, '0')} ${suffix}`;
+    }
+
+    function waTimesKey(schId) {
+        return 'wa_times_sch_' + schId;
+    }
+
+    function waLoadTimes(schId) {
+        try {
+            return JSON.parse(localStorage.getItem(waTimesKey(schId)) || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    // Group the schedule's sessions by subject (missed classes are left out of dates/days).
+    function waGroupSubjects(sch) {
+        const map = {};
+        const order = [];
+        (sch.sessions || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
+            .forEach(sess => {
+                if (sess.status === 'missed') return;
+                const subject = String(sess.subject_name || 'Subject').toUpperCase();
+                if (!map[subject]) {
+                    map[subject] = {
+                        name: subject,
+                        teachers: [],
+                        days: [],
+                        dates: [],
+                        knownTimes: {}
+                    };
+                    order.push(subject);
+                }
+                const g = map[subject];
+                if (sess.teacher_name && !g.teachers.includes(sess.teacher_name)) g.teachers.push(sess
+                    .teacher_name);
+                const d = waParseDate(sess.date);
+                if (d) {
+                    const day = WA_DAYS[d.getDay()];
+                    if (!g.days.includes(day)) g.days.push(day);
+                    g.dates.push(`${WA_MONTHS[d.getMonth()]} ${d.getDate()}`);
+                    if (sess.start_time && !g.knownTimes[day]) g.knownTimes[day] = String(sess.start_time)
+                        .substring(0, 5);
+                }
+            });
+        return order.map(k => map[k]);
+    }
+
+    function waBuildMessage(sch, subjects, times) {
+        const total = parseFloat(sch.total_hours) || 0;
+        let completed = 0;
+        const durations = [];
+        (sch.sessions || []).forEach(sess => {
+            if (sess.status === 'done') completed += parseFloat(sess.planned_hours) || 0;
+            if (sess.status !== 'missed') {
+                const h = waNum(sess.planned_hours);
+                if (parseFloat(h) > 0 && !durations.includes(h)) durations.push(h);
+            }
+        });
+        const durationLabel = durations.length ?
+            durations.map(h => `${h} ${parseFloat(h) === 1 ? 'Hr' : 'Hrs'}`).join(' / ') : '-';
+
+        const lines = [];
+        lines.push('*QUIDEI* - Individual Tuition Class', '', sch.displayTitle, '', '', '');
+        lines.push(`📝 Student Name: *${String(studentName).toUpperCase()}*`, '');
+        lines.push(`📚 Class: ${studentClass}`);
+        lines.push(`⏳ Total Scheduled Hours: ${waNum(total)}`);
+        lines.push('👨‍🏫 ');
+        subjects.forEach(s => lines.push(`      ${s.name}:   ${s.teachers.join(', ')}`));
+        lines.push('', '*Days & Time*', '');
+        subjects.forEach(s => {
+            lines.push(`    ${s.name}`);
+            s.days.forEach(day => lines.push(` ${day} :  ${waTimeLabel(times[s.name + '|' + day])} IST`));
+            lines.push('');
+        });
+        lines.push(`Class Duration - ${durationLabel}`, '');
+        subjects.forEach(s => {
+            lines.push(`*${s.name}*`, '');
+            s.dates.forEach(d => lines.push(d, ''));
+        });
+        lines.push(' ', '');
+        lines.push(`📊 Total Hours Complete:  ${waNum(completed)}/  ${waNum(total)} Hrs`);
+        return lines.join('\n');
+    }
+
+    function waRefreshPreview() {
+        const sch = schedulesById[waCurrentScheduleId];
+        if (!sch) return;
+        const subjects = waGroupSubjects(sch);
+        const times = {};
+        $('#waTimes .wa-time-input').each(function() {
+            times[$(this).data('key')] = $(this).val();
+        });
+        const text = waBuildMessage(sch, subjects, times);
+        $('#waPreview').val(text);
+        $('#waOpenBtn').attr('href', 'https://wa.me/?text=' + encodeURIComponent(text));
+    }
+
+    $('#schedulesContainer').on('click', '.btn-share-whatsapp', function() {
+        const schId = $(this).data('id');
+        const sch = schedulesById[schId];
+        if (!sch) return;
+        waCurrentScheduleId = schId;
+
+        // One time field per subject + weekday (saved value, else a time already recorded on a session)
+        const saved = waLoadTimes(schId);
+        const subjects = waGroupSubjects(sch);
+        let html = '';
+        subjects.forEach(s => s.days.forEach(day => {
+            const key = s.name + '|' + day;
+            const value = saved[key] || s.knownTimes[day] || '';
+            const id = 'wa_t_' + (s.name + '_' + day).replace(/[^A-Za-z0-9]/g, '_');
+            html += `<div class="col-6 col-md-4">
+                <label class="small text-muted d-block" for="${id}">${$('<div>').text(s.name).html()} · ${day}</label>
+                <input type="time" id="${id}" class="form-control form-control-sm wa-time-input" value="${value}">
+            </div>`;
+        }));
+        $('#waTimes').html(html);
+        $('#waTimes .wa-time-input').each(function(i) {
+            const flat = [];
+            subjects.forEach(s => s.days.forEach(day => flat.push(s.name + '|' + day)));
+            $(this).data('key', flat[i]);
+        });
+        $('#waTimesSection').toggleClass('d-none', html === '');
+
+        waRefreshPreview();
+        $('#waCopyBtn').html('<i class="bi bi-clipboard me-1"></i>Copy Text');
+        $('#whatsappModal').modal('show');
+    });
+
+    $('#waTimes').on('change input', '.wa-time-input', function() {
+        const times = waLoadTimes(waCurrentScheduleId);
+        times[$(this).data('key')] = $(this).val();
+        try {
+            localStorage.setItem(waTimesKey(waCurrentScheduleId), JSON.stringify(times));
+        } catch (e) {}
+        waRefreshPreview();
+    });
+
+    // Keep "Open WhatsApp" in sync with manual edits to the preview
+    $('#waPreview').on('input', function() {
+        $('#waOpenBtn').attr('href', 'https://wa.me/?text=' + encodeURIComponent($(this).val()));
+    });
+
+    $('#waCopyBtn').on('click', function() {
+        const btn = $(this);
+        const text = $('#waPreview').val();
+        const done = () => {
+            btn.html('<i class="bi bi-check2 me-1"></i>Copied!');
+            setTimeout(() => btn.html('<i class="bi bi-clipboard me-1"></i>Copy Text'), 2000);
+        };
+        const fallback = () => {
+            const ta = document.getElementById('waPreview');
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                done();
+            } catch (e) {
+                Swal.fire('Copy failed', 'Select the text and copy it manually.', 'warning');
+            }
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done).catch(fallback);
+        } else {
+            fallback();
+        }
     });
 
     // Universal Pay Field Lock

@@ -117,11 +117,17 @@ ob_end_flush();
             <div class="modal-body p-4">
                 <form id="filterForm">
                     <div class="row g-3">
-                        <div class="col-12">
+                        <div class="col-6">
                             <label class="modal-filter-label">Mentor</label>
                             <select id="f_mentor" class="form-select shadow-sm">
                                 <option value="">All Mentors</option>
                                 <option value="Not Assigned">Not Assigned</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="modal-filter-label" for="f_supervisor">Supervisor</label>
+                            <select id="f_supervisor" class="form-select shadow-sm">
+                                <option value="">All Supervisors</option>
                             </select>
                         </div>
                         <div class="col-6">
@@ -375,9 +381,16 @@ $(document).ready(function() {
     // 2. Initialize DataTable
     var table = $('#admissionsTable').DataTable({
         "ajax": "admission_action.php",
+        // Keep the original server order (newest first); SL numbers are filled in on each draw.
+        "order": [],
+        "columnDefs": [{
+            "targets": 0,
+            "orderable": false,
+            "searchable": false
+        }],
         "columns": [{
                 "data": null,
-                "render": (d, t, r, m) => m.row + 1
+                "defaultContent": ""
             },
             {
                 "data": "name",
@@ -434,7 +447,30 @@ $(document).ready(function() {
                     .class);
             });
             uniqueClasses.sort().forEach(cls => $('#f_class').append(new Option(cls, cls)));
+
+            // Fill Supervisor Filter (supervisors of the students' mentors)
+            var supervisors = {};
+            json.data.forEach(row => {
+                if (row.supervisor_id && row.supervisor_name) supervisors[row.supervisor_id] = row
+                    .supervisor_name;
+            });
+            Object.keys(supervisors)
+                .sort((a, b) => supervisors[a].localeCompare(supervisors[b]))
+                .forEach(id => $('#f_supervisor').append(new Option(supervisors[id], id)));
         }
+    });
+
+    // Serial numbers always run 1, 2, 3... over the rows that match the current filters/search
+    // (continuing across pages: page 2 starts after the last number of page 1).
+    table.on('draw.dt', function() {
+        var start = table.page.info().start;
+        table.column(0, {
+            search: 'applied',
+            order: 'applied',
+            page: 'current'
+        }).nodes().each(function(cell, i) {
+            cell.innerHTML = start + i + 1;
+        });
     });
 
     function loadMentors(selectId = '#mentor_select', selectedVal = null) {
@@ -474,6 +510,7 @@ $(document).ready(function() {
         var row = table.row(dataIndex).data();
 
         var mentor = $('#f_mentor').val();
+        var supervisor = $('#f_supervisor').val();
         var grade = $('#f_class').val();
         var status = $('#f_status').val();
         var fee = $('#f_fee').val();
@@ -484,6 +521,7 @@ $(document).ready(function() {
         var team = $('#f_team').val();
 
         if (mentor && row.mentor_name !== mentor) return false;
+        if (supervisor && String(row.supervisor_id) !== supervisor) return false;
         if (grade && row.class !== grade) return false;
         if (status && !row.status_badge.toLowerCase().includes(status)) return false;
         if (fee && !row.fee_display.includes(fee)) return false;

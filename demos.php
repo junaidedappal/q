@@ -7,7 +7,20 @@ if (!isset($_SESSION["loggedin"]) || !in_array($_SESSION['role'], ['admin', 'dem
     exit;
 }
 $available_years = $conn->query('SELECT DISTINCT YEAR(created_at) as year FROM enquiries ORDER BY year DESC');
-$available_months = $conn->query('SELECT DISTINCT MONTH(created_at) as month, MONTHNAME(created_at) as month_name FROM enquiries ORDER BY month ASC');
+$months = [
+    1 => 'January',
+    2 => 'February',
+    3 => 'March',
+    4 => 'April',
+    5 => 'May',
+    6 => 'June',
+    7 => 'July',
+    8 => 'August',
+    9 => 'September',
+    10 => 'October',
+    11 => 'November',
+    12 => 'December',
+];
 $coordinators_result = $conn->query("SELECT id, name FROM users WHERE role IN ('demoCordinator', 'demoAdmin')  AND  status = 'active' ORDER BY name ASC");
 ?>
 <style>
@@ -309,12 +322,11 @@ body {
                 by Month</label>
             <select class="form-select form-select-modern" id="filterMonth">
                 <option value="">All Months</option>
-                <?php
-                while ($month_row = $available_months->fetch_assoc()) {
-                    $month_value = str_pad($month_row['month'], 2, '0', STR_PAD_LEFT);
-                    echo "<option value='{$month_value}'>{$month_row['month_name']}</option>";
-                }
-                ?>
+                <?php foreach ($months as $month_number => $month_name): ?>
+                <option value="<?= str_pad((string) $month_number, 2, '0', STR_PAD_LEFT) ?>">
+                    <?= htmlspecialchars($month_name, ENT_QUOTES, 'UTF-8') ?>
+                </option>
+                <?php endforeach; ?>
             </select>
         </div>
 

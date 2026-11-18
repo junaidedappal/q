@@ -34,7 +34,7 @@ $sql = "SELECT
             (SELECT SUM(sess.planned_hours * sess.teacher_pay) FROM sessions sess JOIN schedules sch ON sess.schedule_id = sch.id 
              WHERE sch.mentor_id = m.id AND sess.status = 'done' AND MONTH(sess.date) = ? AND YEAR(sess.date) = ?) as total_session_teacher_payout,
             -- 4. NEW LOGIC: Calculate Independent Demo Teacher Payout (Duration * Grade Rate)
-            (SELECT SUM(md.duration_hours * g.payment_per_hour) 
+            (SELECT SUM(md.duration_hours * COALESCE(md.teacher_pay, g.payment_per_hour))
              FROM mentor_demos md 
              JOIN students s ON md.student_id = s.id
              JOIN grades g ON s.class = g.grade_name
@@ -189,6 +189,21 @@ body {
 }
 </style>
 
+<script>
+// Saved filters: reopen the last month/year when the page is opened without them in the URL.
+(function() {
+    var key = 'quidei_payouts_filters_<?php echo (int) $userId; ?>';
+    var params = new URLSearchParams(window.location.search);
+    if (params.has('month') || params.has('year') || params.has('export')) return;
+    try {
+        var saved = JSON.parse(localStorage.getItem(key) || '{}');
+        if (saved.month && saved.year) {
+            window.location.replace('?month=' + encodeURIComponent(saved.month) + '&year=' + encodeURIComponent(saved.year));
+        }
+    } catch (e) {}
+})();
+</script>
+
 <div class="container-fluid px-3 px-sm-4 py-3 py-sm-4">
     <!-- Header -->
     <div class="quidei-header mb-3 mb-md-4 shadow-sm">
@@ -237,14 +252,14 @@ body {
 
     <!-- Search and Mentor Filter -->
     <div class="row g-2 mb-3 mb-md-4">
-        <div class="col-12 col-md-7">
+        <div class="col-12 col-md-6">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
                 <input type="search" id="payoutSearch" class="form-control payout-filter border-start-0"
                     placeholder="Search mentors..." aria-label="Search mentors">
             </div>
         </div>
-        <div class="col-12 col-md-5">
+        <div class="col-12 col-md-4">
             <select id="mentorFilter" class="form-select payout-filter" aria-label="Filter by mentor">
                 <option value="">All mentors</option>
                 <?php foreach($payouts as $p): ?>
@@ -252,6 +267,12 @@ body {
                 </option>
                 <?php endforeach; ?>
             </select>
+        </div>
+        <div class="col-12 col-md-2">
+            <button type="button" id="resetPayoutFilters" class="btn btn-light border payout-filter w-100"
+                title="Clear saved filters and show the current month">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+            </button>
         </div>
     </div>
 
@@ -392,8 +413,52 @@ document.addEventListener('DOMContentLoaded', function() {
         noMatches.classList.toggle('d-none', visibleCards > 0 || payoutCards.length === 0);
     }
 
-    searchInput.addEventListener('input', filterPayouts);
-    mentorFilter.addEventListener('change', filterPayouts);
+    // --- Saved filters (kept per user in this browser) ---
+    const storageKey = 'quidei_payouts_filters_<?php echo (int) $userId; ?>';
+
+    function readSavedFilters() {
+        try {
+            return JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function saveFilters() {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({
+                month: <?php echo json_encode(str_pad((string) (int) $selectedMonth, 2, '0', STR_PAD_LEFT)); ?>,
+                year: <?php echo json_encode((string) (int) $selectedYear); ?>,
+                search: searchInput.value,
+                mentor: mentorFilter.value
+            }));
+        } catch (e) {}
+    }
+
+    // Restore search text and mentor choice
+    const saved = readSavedFilters();
+    if (saved.search) searchInput.value = saved.search;
+    if (saved.mentor && mentorFilter.querySelector('option[value="' + saved.mentor + '"]')) {
+        mentorFilter.value = saved.mentor;
+    }
+    filterPayouts();
+    saveFilters(); // remember the month/year currently shown
+
+    searchInput.addEventListener('input', function() {
+        filterPayouts();
+        saveFilters();
+    });
+    mentorFilter.addEventListener('change', function() {
+        filterPayouts();
+        saveFilters();
+    });
+
+    document.getElementById('resetPayoutFilters').addEventListener('click', function() {
+        try {
+            localStorage.removeItem(storageKey);
+        } catch (e) {}
+        window.location.href = '?month=<?php echo date('m'); ?>&year=<?php echo date('Y'); ?>';
+    });
 });
 </script>
 

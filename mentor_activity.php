@@ -53,6 +53,23 @@ if (!$mentors) {
     exit('Unable to load the mentor list.');
 }
 
+// Supervisor filter list (not needed for supervisors, who only see their own mentors)
+$supervisorOptions = [];
+if ($role !== 'supervisor') {
+    $supervisorResult = $conn->query(
+        "SELECT DISTINCT sup.id, sup.name
+         FROM mentors m
+         JOIN users sup ON sup.id = m.supervisor_id
+         ORDER BY sup.name ASC"
+    );
+    if (!$supervisorResult) {
+        error_log('Mentor activity supervisor filter query failed: ' . $conn->error);
+        http_response_code(500);
+        exit('Unable to load the supervisor list.');
+    }
+    $supervisorOptions = $supervisorResult->fetch_all(MYSQLI_ASSOC);
+}
+
 $scopeLabel = match ($role) {
     'admin' => 'All mentors',
     'qualitycontroller' => 'All mentors · read-only',
@@ -292,7 +309,7 @@ body {
         <div class="card-body p-3 p-lg-4">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-1 mb-3">
                 <h2 class="activity-panel-heading">Activity filters</h2>
-                <span class="small text-muted">Choose a time period and mentor</span>
+                <span class="small text-muted">Choose a time period, mentor, and status</span>
             </div>
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-6 col-xl-2">
@@ -312,13 +329,33 @@ body {
                     <label for="dateTo" class="form-label">To</label>
                     <input type="date" id="dateTo" class="form-control">
                 </div>
-                <div class="col-12 col-md-6 col-xl-3">
+                <?php if ($role !== 'supervisor'): ?>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label for="supervisorFilter" class="form-label">Supervisor</label>
+                    <select id="supervisorFilter" class="form-select">
+                        <option value="">All supervisors</option>
+                        <?php foreach ($supervisorOptions as $supervisor): ?>
+                        <option value="<?= (int) $supervisor['id'] ?>"><?= htmlspecialchars($supervisor['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
+                <div class="col-12 col-md-6 col-xl-2">
                     <label for="mentorFilter" class="form-label">Mentor</label>
                     <select id="mentorFilter" class="form-select">
                         <option value=""><?= htmlspecialchars($mentorFilterLabel, ENT_QUOTES, 'UTF-8') ?></option>
                         <?php while ($mentor = $mentors->fetch_assoc()): ?>
                         <option value="<?= (int) $mentor['id'] ?>"><?= htmlspecialchars($mentor['name'], ENT_QUOTES, 'UTF-8') ?></option>
                         <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label for="statusFilter" class="form-label">Status</label>
+                    <select id="statusFilter" class="form-select">
+                        <option value="">All statuses</option>
+                        <option value="planned">Planned</option>
+                        <option value="done">Done</option>
+                        <option value="missed">Missed</option>
                     </select>
                 </div>
                 <div class="col-12 col-md-6 col-xl-2">
@@ -353,6 +390,42 @@ body {
     </section>
 </main>
 
+<!-- Absence Reason Popup -->
+<div class="modal fade" id="absenceReasonModal" tabindex="-1" aria-labelledby="absenceReasonTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 1.25rem; overflow: hidden;">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold" id="absenceReasonTitle">
+                    <i class="bi bi-x-circle me-2" aria-hidden="true"></i>Class Marked Absent
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="p-3 mb-3 rounded-3 bg-danger-subtle border border-danger-subtle">
+                    <div class="small fw-bold text-danger text-uppercase mb-1">Reason for absence</div>
+                    <div class="fs-5 fw-bold text-dark" id="absReason"></div>
+                </div>
+                <dl class="row small mb-0">
+                    <dt class="col-4 text-muted">Date</dt>
+                    <dd class="col-8" id="absDate"></dd>
+                    <dt class="col-4 text-muted">Student</dt>
+                    <dd class="col-8" id="absStudent"></dd>
+                    <dt class="col-4 text-muted">Subject</dt>
+                    <dd class="col-8" id="absSubject"></dd>
+                    <dt class="col-4 text-muted">Mentor</dt>
+                    <dd class="col-8" id="absMentor"></dd>
+                    <dt class="col-4 text-muted">Teacher</dt>
+                    <dd class="col-8 mb-0" id="absTeacher"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php include 'includes/footer.php'; ?>
 
 <script>
@@ -364,7 +437,9 @@ $(document).ready(function() {
                 data.quick = $('#quickDate').val();
                 data.from = $('#dateFrom').val();
                 data.to = $('#dateTo').val();
+                data.supervisor_id = $('#supervisorFilter').val() || '';
                 data.mentor_id = $('#mentorFilter').val();
+                data.status = $('#statusFilter').val();
             },
             error: function(xhr) {
                 var response = xhr.responseJSON;
@@ -389,6 +464,19 @@ $(document).ready(function() {
             emptyTable: 'No mentor activity found for this period.',
             zeroRecords: 'No activity matches your search.'
         }
+    });
+
+    // Absent (missed) class: show the reason in a popup. Values are already HTML-escaped by the server.
+    $('#activityTable tbody').on('click', '.btn-absence-reason', function() {
+        var row = table.row($(this).closest('tr')).data();
+        if (!row) return;
+        $('#absReason').html(row.absence_reason || '<span class="text-muted fw-normal fs-6">No reason recorded.</span>');
+        $('#absDate').html(row.date_label || '');
+        $('#absStudent').html(row.student_name || '');
+        $('#absSubject').html(row.subject || '');
+        $('#absMentor').html(row.mentor_name || '');
+        $('#absTeacher').html(row.teacher_name || '');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('absenceReasonModal')).show();
     });
 
     $('#quickDate').on('change', function() {

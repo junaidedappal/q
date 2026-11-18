@@ -24,6 +24,15 @@ if ($role === 'supervisor') {
     }
 }
 
+// Supervisor filter (admin / quality controller). Supervisors stay scoped to themselves.
+$supervisorParam = $_GET['supervisor_id'] ?? '';
+if (!is_string($supervisorParam) || ($supervisorParam !== '' && (!ctype_digit($supervisorParam) || (int) $supervisorParam < 1))) {
+    mentor_activity_send_error(400, 'Choose a valid supervisor.');
+}
+if ($role !== 'supervisor' && $supervisorParam !== '') {
+    $supervisorScopeId = (int) $supervisorParam;
+}
+
 $quick = $_GET['quick'] ?? 'today';
 if (!is_string($quick) || !in_array($quick, ['today', 'yesterday', 'this_week', 'custom'], true)) {
     mentor_activity_send_error(400, 'Choose a valid date filter.');
@@ -61,81 +70,116 @@ if (!is_string($mentorParam) || ($mentorParam !== '' && (!ctype_digit($mentorPar
 }
 $mentorId = $mentorParam === '' ? 0 : (int) $mentorParam;
 
+$status = $_GET['status'] ?? '';
+if (!is_string($status) || !in_array($status, ['', 'planned', 'done', 'missed'], true)) {
+    mentor_activity_send_error(400, 'Choose a valid status filter.');
+}
+
+// Ensure your 'sessions' table actually contains schedule_id and teacher_id. 
+// If it only contains mentor_id/student_id directly, these JOINs will trigger a SQL error.
 $sql = "SELECT
             s.date, s.start_time, s.planned_hours, s.status, s.notes,
             sub.name AS subject_name,
             stu.name AS student_name,
             u_t.name AS teacher_name,
-            u_m.name AS mentor_name
+            u_m.name AS mentor_name,
+            (SELECT a.reason FROM attendance a
+             WHERE a.session_id = s.id AND a.attended = 0
+             ORDER BY a.id DESC LIMIT 1) AS absence_reason
         FROM sessions s
         JOIN subjects sub ON s.subject_id = sub.id
-        JOIN teachers t ON s.teacher_id = t.id
-        JOIN users u_t ON t.user_id = u_t.id
-        JOIN schedules sch ON s.schedule_id = sch.id
-        JOIN students stu ON sch.student_id = stu.id
-        JOIN mentors m ON sch.mentor_id = m.id
-        JOIN users u_m ON m.user_id = u_m.id
+        LEFT JOIN teachers t ON s.teacher_id = t.id
+        LEFT JOIN users u_t ON t.user_id = u_t.id
+        LEFT JOIN schedules sch ON s.schedule_id = sch.id
+        LEFT JOIN students stu ON sch.student_id = stu.id
+        LEFT JOIN mentors m ON sch.mentor_id = m.id
+        LEFT JOIN users u_m ON m.user_id = u_m.id
         WHERE $dateCondition
           AND (? = 0 OR m.supervisor_id = ?)
           AND (? = 0 OR m.id = ?)
+          /* Force the collation on the status comparison */
+          AND (? = '' OR s.status COLLATE utf8mb4_unicode_ci = ?)
         ORDER BY s.date DESC, s.start_time DESC";
 
-$stmt = $conn->prepare($sql);
-if (!$stmt) {
-    error_log('Mentor activity query preparation failed: ' . $conn->error);
-    mentor_activity_send_error(500, 'Unable to load mentor activity.');
+try {
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception('Prepare failed: ' . $conn->error);
+    }
+
+    if ($quick === 'custom') {
+        $stmt->bind_param(
+            'ssiiiiss',
+            $dateParameters[0],
+            $dateParameters[1],
+            $supervisorScopeId,
+            $supervisorScopeId,
+            $mentorId,
+            $mentorId,
+            $status,
+            $status
+        );
+    } else {
+        $stmt->bind_param(
+            'iiiiss',
+            $supervisorScopeId,
+            $supervisorScopeId,
+            $mentorId,
+            $mentorId,
+            $status,
+            $status
+        );
+    }
+
+    if (!$stmt->execute()) {
+        throw new Exception('Execution failed: ' . $stmt->error);
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        throw new Exception('Result retrieval failed: ' . $stmt->error);
+    }
+
+    $escape = static fn($value): string => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $data = [];
+    
+    while ($row = $result->fetch_assoc()) {
+        $statusClass = match ($row['status']) {
+            'done' => 'bg-success',
+            'missed' => 'bg-danger',
+            'planned' => 'bg-primary',
+            default => 'bg-secondary'
+        };
+
+        $statusBadge = "<span class='badge $statusClass'>" . $escape(strtoupper($row['status'])) . '</span>';
+        $absenceReason = '';
+        if ($row['status'] === 'missed') {
+            // Reason saved with the attendance entry; older entries may only have it in the session notes.
+            $absenceReason = trim((string) ($row['absence_reason'] ?? ''));
+            if ($absenceReason === '') {
+                $absenceReason = trim((string) ($row['notes'] ?? ''));
+            }
+            $statusBadge = "<button type='button' class='badge bg-danger border-0 btn-absence-reason' title='View absence reason'>"
+                . 'MISSED <i class="bi bi-info-circle ms-1"></i></button>';
+        }
+
+        $data[] = [
+            'date_label' => $escape(date('d M Y', strtotime($row['date']))),
+            'absence_reason' => $escape($absenceReason),
+            'time_date' => '<b>' . $escape(date('d M', strtotime($row['date']))) . '</b><br><small>' . $escape($row['start_time'] ?? '--:--') . '</small>',
+            'student_name' => $escape($row['student_name']),
+            'subject' => $escape($row['subject_name']),
+            'teacher_name' => $escape($row['teacher_name'] ?? 'N/A'),
+            'mentor_name' => $escape($row['mentor_name'] ?? 'N/A'),
+            'hrs' => '<b>' . $escape($row['planned_hours']) . '</b>',
+            'status_badge' => $statusBadge
+        ];
+    }
+
+    echo json_encode(['data' => $data], JSON_INVALID_UTF8_SUBSTITUTE);
+
+} catch (Throwable $e) {
+    // If there is an SQL syntax issue or a missing column, it will now print out exactly what it is on your screen.
+    error_log('Mentor activity DB error: ' . $e->getMessage());
+    mentor_activity_send_error(500, 'Database Error: ' . $e->getMessage());
 }
-
-if ($quick === 'custom') {
-    $stmt->bind_param(
-        'ssiiii',
-        $dateParameters[0],
-        $dateParameters[1],
-        $supervisorScopeId,
-        $supervisorScopeId,
-        $mentorId,
-        $mentorId
-    );
-} else {
-    $stmt->bind_param(
-        'iiii',
-        $supervisorScopeId,
-        $supervisorScopeId,
-        $mentorId,
-        $mentorId
-    );
-}
-
-if (!$stmt->execute()) {
-    error_log('Mentor activity query execution failed: ' . $stmt->error);
-    mentor_activity_send_error(500, 'Unable to load mentor activity.');
-}
-
-$result = $stmt->get_result();
-if (!$result) {
-    error_log('Mentor activity result retrieval failed: ' . $stmt->error);
-    mentor_activity_send_error(500, 'Unable to load mentor activity.');
-}
-
-$escape = static fn($value): string => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$data = [];
-while ($row = $result->fetch_assoc()) {
-    $statusClass = match ($row['status']) {
-        'done' => 'bg-success',
-        'missed' => 'bg-danger',
-        'planned' => 'bg-primary',
-        default => 'bg-secondary'
-    };
-
-    $data[] = [
-        'time_date' => '<b>' . $escape(date('d M', strtotime($row['date']))) . '</b><br><small>' . $escape($row['start_time'] ?? '--:--') . '</small>',
-        'student_name' => $escape($row['student_name']),
-        'subject' => $escape($row['subject_name']),
-        'teacher_name' => $escape($row['teacher_name']),
-        'mentor_name' => $escape($row['mentor_name']),
-        'hrs' => '<b>' . $escape($row['planned_hours']) . '</b>',
-        'status_badge' => "<span class='badge $statusClass'>" . $escape(strtoupper($row['status'])) . '</span>'
-    ];
-}
-
-echo json_encode(['data' => $data], JSON_INVALID_UTF8_SUBSTITUTE);

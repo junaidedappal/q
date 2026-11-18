@@ -54,7 +54,7 @@ while ($s = $res_sessions->fetch_assoc()) {
 }
 
 // 3. Fetch Independent Mentor Demos 
-$demo_sql = "SELECT md.demo_date as date, md.duration_hours as planned_hours, g.payment_per_hour as teacher_pay, md.feedback as notes, sub.name as subject_name, stu.id as student_id, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Independent Demo' as type FROM mentor_demos md JOIN students stu ON md.student_id = stu.id JOIN grades g ON stu.class = g.grade_name JOIN subjects sub ON md.subject_id = sub.id JOIN teachers t ON md.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE stu.mentor_id = ? AND MONTH(md.demo_date) = ? AND YEAR(md.demo_date) = ? ORDER BY u_t.name ASC";
+$demo_sql = "SELECT md.demo_date as date, md.duration_hours as planned_hours, COALESCE(md.teacher_pay, g.payment_per_hour) as teacher_pay, md.feedback as notes, sub.name as subject_name, stu.id as student_id, stu.name as student_name, u_t.name as teacher_name, u_t.phone as teacher_phone, u_t.id as teacher_user_id, 'Independent Demo' as type FROM mentor_demos md JOIN students stu ON md.student_id = stu.id JOIN grades g ON stu.class = g.grade_name JOIN subjects sub ON md.subject_id = sub.id JOIN teachers t ON md.teacher_id = t.id JOIN users u_t ON t.user_id = u_t.id WHERE stu.mentor_id = ? AND MONTH(md.demo_date) = ? AND YEAR(md.demo_date) = ? ORDER BY u_t.name ASC";
 $d_stmt = $conn->prepare($demo_sql); 
 $d_stmt->bind_param("iii", $mentor_id, $month, $year); 
 $d_stmt->execute(); 
@@ -167,6 +167,14 @@ if (isset($_GET['export']) && $_GET['export'] == 'csv') {
     }
 }
 </style>
+
+<!-- Back to Salary Payouts (same month/year; saved search & mentor filter are restored there) -->
+<div class="mb-3 no-print">
+    <a href="quidei_payouts.php?month=<?php echo str_pad((string) $month, 2, '0', STR_PAD_LEFT); ?>&amp;year=<?php echo $year; ?>"
+        class="btn btn-outline-dark btn-sm rounded-pill px-3">
+        <i class="bi bi-arrow-left me-1"></i> Back to Payouts
+    </a>
+</div>
 
 <!-- Header Summary -->
 <div class="card card-main bg-white p-3 p-md-4 mb-4">

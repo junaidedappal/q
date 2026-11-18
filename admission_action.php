@@ -63,7 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 0 as total_hours, 0 as paid_hours, 0 as completed_hours, 
                 NULL as start_date, NULL as end_date,
                 0 as checklist_material, 0 as checklist_group, 0 as checklist_teams, 0 as exam_count,
-                0 as student_id, 0 as schedule_id
+                0 as student_id, 0 as schedule_id,
+                NULL as supervisor_id, '' as supervisor_name,
+                0 as sort_group
             FROM enquiries e WHERE e.status = 'admission_confirmed')
             UNION ALL
             (SELECT 
@@ -75,14 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 sch.start_date, sch.end_date,
                 s.checklist_material, s.checklist_group, s.checklist_teams, 
                 (SELECT COUNT(*) FROM schedule_exams ex WHERE ex.schedule_id = sch.id) as exam_count,
-                s.id AS student_id, COALESCE(sch.id, 0) AS schedule_id
-            FROM students s 
-            LEFT JOIN mentors m ON s.mentor_id = m.id 
+                s.id AS student_id, COALESCE(sch.id, 0) AS schedule_id,
+                m.supervisor_id AS supervisor_id, COALESCE(sup.name, '') AS supervisor_name,
+                1 as sort_group
+            FROM students s
+            LEFT JOIN mentors m ON s.mentor_id = m.id
             LEFT JOIN users u ON m.user_id = u.id
+            LEFT JOIN users sup ON sup.id = m.supervisor_id
             LEFT JOIN schedules sch ON sch.id = (
                 SELECT id FROM schedules WHERE student_id = s.id ORDER BY start_date DESC, id DESC LIMIT 1
             )
-            ) ORDER BY record_id DESC";
+            ) ORDER BY sort_group ASC, record_id DESC"; // 'New' (admission confirmed) enquiries first
 
             $result = $conn->query($sql);
             $data = [];

@@ -29,7 +29,7 @@ $moduleGroups = [
        
         [
             'href' => 'finalized_students.php',
-            'roles' => ['sales', 'admin'],
+            'roles' => [ 'admin'],
             'class' => 'card-admissions',
             'icon' => 'bi-mortarboard-fill',
             'title' => 'Student Data',
