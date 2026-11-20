@@ -523,7 +523,8 @@ $(document).ready(function() {
         if (mentor && row.mentor_name !== mentor) return false;
         if (supervisor && String(row.supervisor_id) !== supervisor) return false;
         if (grade && row.class !== grade) return false;
-        if (status && !row.status_badge.toLowerCase().includes(status)) return false;
+        // Exact match on the raw status ("inactive" contains "active", so substring checks leak rows)
+        if (status && (row.source !== 'student' || row.status !== status)) return false;
         if (fee && !row.fee_display.includes(fee)) return false;
 
         if (exam === 'done' && !row.check_exam.includes('text-success')) return false;

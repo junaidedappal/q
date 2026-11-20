@@ -577,45 +577,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            // 3. DETERMINE ALLOWED HOURS LIMIT
+            // 3. Planning sessions does not depend on payment.
+            // The paid-hours / grace-hours limit is enforced when attendance is marked (save_attendance).
             $student_id = $sch_data['student_id'];
-            $paid_hours = floatval($sch_data['paid_hours']);
-            $sch_count = intval($sch_data['sch_count']);
 
-            if ($paid_hours > 0) {
-                $allowed_limit = $paid_hours;
-            } else {
-                // Rule: New student (1st schedule) = 0 grace, Old student = 2.0 grace
-                $allowed_limit = ($sch_count <= 1) ? 0 : 2.0;
-            }
-
-            // 4. CALCULATE PROPOSED HOURS
+            // 4. PARSE SELECTED DATES
             $dates_string = $_POST['dates'];
             $dates_array = array_values(array_filter(array_map('trim', explode(', ', $dates_string))));
             if (empty($dates_array)) {
                 echo json_encode(['status' => 'error', 'message' => 'Please select at least one session date.']);
-                exit;
-            }
-            $hours_to_add = count($dates_array) * $planned_hours;
-
-            // 5. CHECK CURRENT USAGE IN THIS SCHEDULE
-            $sum_query = $conn->prepare('SELECT SUM(planned_hours) as used FROM sessions WHERE schedule_id = ?');
-            $sum_query->bind_param('i', $schedule_id);
-            $sum_query->execute();
-            $used_hours = floatval($sum_query->get_result()->fetch_assoc()['used'] ?? 0);
-
-            $new_total = $used_hours + $hours_to_add;
-
-            // 6. VALIDATE HOURS LIMIT
-            if ($new_total > $allowed_limit) {
-                if ($paid_hours <= 0) {
-                    $msg = ($sch_count <= 1)
-                        ? "Payment Required: As this is the student's first schedule, sessions cannot be added until payment is recorded."
-                        : "Grace Limit Reached: For unpaid schedules, only 2 grace hours allowed. Total used: $used_hours, Trying to add: $hours_to_add.";
-                } else {
-                    $msg = "Limit Exceeded: Student paid for $paid_hours hours. This action would result in $new_total total hours.";
-                }
-                echo json_encode(['status' => 'error', 'message' => $msg]);
                 exit;
             }
 

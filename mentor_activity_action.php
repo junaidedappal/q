@@ -159,8 +159,13 @@ try {
             if ($absenceReason === '') {
                 $absenceReason = trim((string) ($row['notes'] ?? ''));
             }
-            $statusBadge = "<button type='button' class='badge bg-danger border-0 btn-absence-reason' title='View absence reason'>"
-                . 'MISSED <i class="bi bi-info-circle ms-1"></i></button>';
+        }
+        // Reason column: shown only for missed classes.
+        $reasonDisplay = '';
+        if ($row['status'] === 'missed') {
+            $reasonDisplay = $absenceReason !== ''
+                ? '<span class="text-danger fw-semibold">' . $escape($absenceReason) . '</span>'
+                : '<span class="text-muted small">No reason recorded</span>';
         }
 
         $data[] = [
@@ -172,7 +177,8 @@ try {
             'teacher_name' => $escape($row['teacher_name'] ?? 'N/A'),
             'mentor_name' => $escape($row['mentor_name'] ?? 'N/A'),
             'hrs' => '<b>' . $escape($row['planned_hours']) . '</b>',
-            'status_badge' => $statusBadge
+            'status_badge' => $statusBadge,
+            'reason_display' => $reasonDisplay
         ];
     }
 

@@ -382,6 +382,7 @@ body {
                             <th>Teacher</th>
                             <th class="text-center">Hours</th>
                             <th>Status</th>
+                            <th>Reason</th>
                         </tr>
                     </thead>
                 </table>
@@ -389,42 +390,6 @@ body {
         </div>
     </section>
 </main>
-
-<!-- Absence Reason Popup -->
-<div class="modal fade" id="absenceReasonModal" tabindex="-1" aria-labelledby="absenceReasonTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 1.25rem; overflow: hidden;">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold" id="absenceReasonTitle">
-                    <i class="bi bi-x-circle me-2" aria-hidden="true"></i>Class Marked Absent
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="p-3 mb-3 rounded-3 bg-danger-subtle border border-danger-subtle">
-                    <div class="small fw-bold text-danger text-uppercase mb-1">Reason for absence</div>
-                    <div class="fs-5 fw-bold text-dark" id="absReason"></div>
-                </div>
-                <dl class="row small mb-0">
-                    <dt class="col-4 text-muted">Date</dt>
-                    <dd class="col-8" id="absDate"></dd>
-                    <dt class="col-4 text-muted">Student</dt>
-                    <dd class="col-8" id="absStudent"></dd>
-                    <dt class="col-4 text-muted">Subject</dt>
-                    <dd class="col-8" id="absSubject"></dd>
-                    <dt class="col-4 text-muted">Mentor</dt>
-                    <dd class="col-8" id="absMentor"></dd>
-                    <dt class="col-4 text-muted">Teacher</dt>
-                    <dd class="col-8 mb-0" id="absTeacher"></dd>
-                </dl>
-            </div>
-            <div class="modal-footer bg-light border-0">
-                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <?php include 'includes/footer.php'; ?>
 
@@ -454,7 +419,8 @@ $(document).ready(function() {
             { data: 'mentor_name' },
             { data: 'teacher_name' },
             { data: 'hrs', className: 'text-center' },
-            { data: 'status_badge' }
+            { data: 'status_badge' },
+            { data: 'reason_display' }
         ],
         order: [],
         pageLength: 25,
@@ -464,19 +430,6 @@ $(document).ready(function() {
             emptyTable: 'No mentor activity found for this period.',
             zeroRecords: 'No activity matches your search.'
         }
-    });
-
-    // Absent (missed) class: show the reason in a popup. Values are already HTML-escaped by the server.
-    $('#activityTable tbody').on('click', '.btn-absence-reason', function() {
-        var row = table.row($(this).closest('tr')).data();
-        if (!row) return;
-        $('#absReason').html(row.absence_reason || '<span class="text-muted fw-normal fs-6">No reason recorded.</span>');
-        $('#absDate').html(row.date_label || '');
-        $('#absStudent').html(row.student_name || '');
-        $('#absSubject').html(row.subject || '');
-        $('#absMentor').html(row.mentor_name || '');
-        $('#absTeacher').html(row.teacher_name || '');
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('absenceReasonModal')).show();
     });
 
     $('#quickDate').on('change', function() {
