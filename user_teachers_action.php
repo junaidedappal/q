@@ -3,6 +3,7 @@ session_start();
 ob_start();
 header('Content-Type: application/json');
 require 'includes/db.php';
+require_once 'includes/teacher_usage.php';
 
 // Authorization Check
 if (!isset($_SESSION["loggedin"]) || !in_array($_SESSION['role'], ['admin', 'hrmanager'])) {
@@ -79,8 +80,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'delete') {
             $uid = intval($_POST['user_id']);
-            if ($uid === $_SESSION['id']) throw new Exception('You cannot delete your own account.');
-            
+            if ($uid === (int) $_SESSION['id']) throw new Exception('You cannot delete your own account.');
+
+            // Only teacher accounts can be deleted from this module
+            $teacher_check = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'");
+            $teacher_check->bind_param("i", $uid);
+            $teacher_check->execute();
+            if (!$teacher_check->get_result()->fetch_assoc()) {
+                throw new Exception('Teacher account not found.');
+            }
+
+            // Deleting would cascade-delete sessions, demos and payouts
+            $usage = teacher_usage_counts($conn, $uid);
+            if (!empty($usage)) {
+                throw new Exception(teacher_usage_message($usage));
+            }
+
             $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
             $stmt->bind_param("i", $uid);
             $stmt->execute();

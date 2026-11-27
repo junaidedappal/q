@@ -1,140 +1,108 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
+$quideiShell = $quideiShell ?? false;
 ?>
+            </div><!-- /.app-content -->
 
-</div> <?php if ($currentPage != 'login.php'): ?>
-<footer class="footer-custom mt-auto">
-    <div class="container py-5">
-        <div class="row g-4">
-            <div class="col-lg-6 text-center text-lg-start">
-                <div class="footer-brand mb-3">
-                    <i class="bi bi-mortarboard-fill me-2"></i> QUIDEI EMS
+            <?php if ($currentPage != 'login.php'): ?>
+            <footer class="app-footer">
+                <div class="app-footer-inner">
+                    <div class="app-footer-brand">
+                        <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+                        <span>QUIDEI EMS</span>
+                        <span class="app-footer-sep" aria-hidden="true">·</span>
+                        <span class="app-footer-muted">© <?php echo date('Y'); ?>
+                            <a href="https://infonile.in" target="_blank" rel="noopener">INFONILE</a></span>
+                    </div>
+                    <div class="app-footer-meta">
+                        <a href="mailto:support@quidei.com" class="app-footer-muted"><i class="bi bi-envelope"
+                                aria-hidden="true"></i> support@quidei.com</a>
+                        <span class="badge bg-light text-dark fw-normal border">Version 1.0</span>
+                    </div>
                 </div>
-                <p class="footer-text mb-4">
-                    Providing cutting-edge digital infrastructure for modern education systems.
-                </p>
-                <div class="footer-badges d-flex justify-content-center justify-content-lg-start">
-                    <span class="badge-item"><i class="bi bi-shield-check"></i> Secure</span>
-                    <span class="badge-item"><i class="bi bi-lightning-fill"></i> Fast</span>
-                </div>
-            </div>
-
-            <div class="col-lg-6 text-center text-lg-end">
-                <h6 class="footer-heading mb-3">Stay Connected</h6>
-                <div class="footer-social mb-3 d-flex justify-content-center justify-content-lg-end">
-                    <a href="#"><i class="bi bi-facebook"></i></a>
-                    <a href="#"><i class="bi bi-twitter-x"></i></a>
-                    <a href="#"><i class="bi bi-linkedin"></i></a>
-                    <a href="#"><i class="bi bi-instagram"></i></a>
-                </div>
-                <p class="footer-contact">
-                    <i class="bi bi-envelope-fill me-2"></i>support@quidei.com
-                </p>
-            </div>
-        </div>
-
-        <hr class="footer-divider">
-
-        <div class="row align-items-center">
-            <div class="col-md-6 text-center text-md-start">
-                <p class="footer-copyright mb-0">
-                    © <?php echo date('Y'); ?> <strong><a href="https://infonile.in" target="_blank"
-                            class="text-decoration-none">INFONILE</a></strong>
-                </p>
-            </div>
-            <div class="col-md-6 text-center text-md-end">
-                <p class="footer-version mb-0 mt-2 mt-md-0">
-                    <span class="badge bg-light text-dark fw-normal border">Version 1.0</span>
-                </p>
-            </div>
-        </div>
-    </div>
-</footer>
+            </footer>
+            <?php endif ?>
+        </div><!-- /.app-main -->
+<?php if ($quideiShell): ?>
+    </div><!-- /.app-shell -->
+<?php endif; ?>
 
 <style>
-.footer-custom {
-    background-color: #ffffff;
-    border-top: 1px solid #f1f5f9;
-    color: var(--slate-900);
+.app-footer {
+    flex: 0 0 auto;
+    margin-top: auto;
+    background: #fff;
+    border-top: 1px solid var(--slate-200);
 }
 
-.footer-brand {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--slate-900);
-}
-
-.footer-brand i {
-    color: var(--emerald-500);
-}
-
-.footer-text {
-    color: #64748b;
-    max-width: 400px;
+.app-footer-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    max-width: 1680px;
     margin: 0 auto;
+    padding: 1rem .875rem;
+    font-size: .82rem;
+    text-align: center;
 }
 
-@media (min-width: 992px) {
-    .footer-text {
-        margin: 0;
+@media (min-width: 768px) {
+    .app-footer-inner {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        text-align: left;
     }
 }
 
-.badge-item {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--emerald-600);
-    margin-right: 10px;
-}
-
-.footer-heading {
-    font-weight: 700;
-    color: var(--slate-900);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.footer-social a {
-    width: 40px;
-    height: 40px;
-    background: #f8fafc;
-    border-radius: 10px;
+.app-footer-brand {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
+    gap: .4rem;
     color: var(--slate-900);
-    margin-left: 10px;
-    transition: 0.3s;
-    border: 1px solid #e2e8f0;
-}
-
-.footer-social a:hover {
-    background: var(--emerald-500);
-    color: white;
-    transform: translateY(-3px);
-    border-color: var(--emerald-500);
-}
-
-.footer-divider {
-    border-color: #f1f5f9;
-    margin: 2rem 0;
-}
-
-.footer-copyright {
-    color: #64748b;
-    font-size: 0.9rem;
-}
-
-.footer-copyright a {
-    color: var(--emerald-600);
     font-weight: 700;
 }
+
+.app-footer-brand i {
+    color: var(--emerald-500);
+}
+
+.app-footer-sep {
+    color: #cbd5e1;
+}
+
+.app-footer-muted {
+    color: var(--slate-500);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.app-footer a {
+    color: var(--emerald-600);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.app-footer a.app-footer-muted {
+    color: var(--slate-500);
+    font-weight: 500;
+}
+
+.app-footer a:hover {
+    text-decoration: underline;
+}
+
+.app-footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+}
 </style>
-<?php endif ?>
 
 <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -166,16 +134,54 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-const navbar = document.querySelector('.navbar-custom');
-if (navbar) {
-    window.addEventListener('scroll', () => {
-        if (window.pageYOffset > 50) {
-            navbar.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.05)';
-        } else {
-            navbar.style.boxShadow = 'none';
-        }
+// Top bar shadow once the page scrolls.
+(() => {
+    const topbar = document.querySelector('.app-topbar');
+    if (!topbar) return;
+    const update = () => topbar.classList.toggle('is-scrolled', window.scrollY > 8);
+    window.addEventListener('scroll', update, {
+        passive: true
     });
-}
+    update();
+})();
+
+// Large screens: collapse the sidebar to an icon rail (remembered per browser).
+(() => {
+    const btn = document.getElementById('sbCollapseBtn');
+    if (!btn) return;
+    const root = document.documentElement;
+    const icon = btn.querySelector('i');
+    const sync = () => {
+        const collapsed = root.classList.contains('sb-collapsed');
+        btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+        btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        icon.className = 'bi ' + (collapsed ? 'bi-layout-sidebar' : 'bi-layout-sidebar-inset');
+    };
+    btn.addEventListener('click', () => {
+        root.classList.toggle('sb-collapsed');
+        try {
+            localStorage.setItem('quidei.sidebar', root.classList.contains('sb-collapsed') ? 'collapsed' :
+                'expanded');
+        } catch (e) {}
+        sync();
+        // Let DataTables and other width-aware widgets re-measure after the transition.
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
+    });
+    sync();
+})();
+
+// Keep the active menu item in view when the sidebar is long.
+(() => {
+    const nav = document.querySelector('.sb-nav');
+    const active = nav && nav.querySelector('.sb-link.active');
+    if (!active) return;
+    const navBox = nav.getBoundingClientRect();
+    const linkBox = active.getBoundingClientRect();
+    if (linkBox.bottom > navBox.bottom || linkBox.top < navBox.top) {
+        nav.scrollTop += linkBox.top - navBox.top - navBox.height / 2 + linkBox.height / 2;
+    }
+})();
 </script>
 </body>
 

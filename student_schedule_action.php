@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 $schedule['exams'] = $exams;
                 $sessions = [];
                 $session_stmt = $conn->prepare('
-                    SELECT s.*, sub.name as subject_name, u.name as teacher_name 
+                    SELECT s.*, sub.name as subject_name, u.name as teacher_name, t.teacher_reg_code
                     FROM sessions s
                     JOIN subjects sub ON s.subject_id = sub.id
                     JOIN teachers t ON s.teacher_id = t.id
@@ -90,12 +90,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $warning = null;
             try {
                 $demo_stmt = $conn->prepare('
-                SELECT md.*, s.name as subject_name, u.name as teacher_name,
+                SELECT md.*, s.name as subject_name, COALESCE(u.name, \'Deleted teacher\') as teacher_name,
                        COALESCE(md.teacher_pay, g.payment_per_hour, 0) as effective_pay
                 FROM mentor_demos md
                 JOIN subjects s ON md.subject_id = s.id
-                JOIN teachers t ON md.teacher_id = t.id
-                JOIN users u ON t.user_id = u.id
+                /* LEFT JOIN: keep demos visible even if the teacher was deleted */
+                LEFT JOIN teachers t ON md.teacher_id = t.id
+                LEFT JOIN users u ON t.user_id = u.id
                 LEFT JOIN students stu ON stu.id = md.student_id
                 LEFT JOIN grades g ON g.grade_name = stu.class
                 WHERE md.student_id = ?
@@ -145,7 +146,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             // --- NEW CASE: Fetch Single Demo for Edit ---
         case 'get_single_mentor_demo':
             $demo_id = intval($_GET['demo_id']);
-            $stmt = $conn->prepare("SELECT * FROM mentor_demos WHERE id = ?");
+            // Include the demo's own teacher so Edit can show them even if inactive or deleted
+            $stmt = $conn->prepare("SELECT md.*, u.name AS teacher_name, t.teacher_reg_code, u.status AS teacher_status
+                                    FROM mentor_demos md
+                                    LEFT JOIN teachers t ON t.id = md.teacher_id
+                                    LEFT JOIN users u ON u.id = t.user_id
+                                    WHERE md.id = ?");
             $stmt->bind_param("i", $demo_id);
             $stmt->execute();
             $result = $stmt->get_result()->fetch_assoc();

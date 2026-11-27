@@ -1013,9 +1013,17 @@ $(document).ready(function() {
 
                 // Populate dropdowns
                 let tOpts = '';
+                // The dropdown lists active teachers only; keep this demo's own teacher
+                // selectable even when they are inactive or deleted.
+                if (d.teacher_id && !teachersAndSubjects.teachers.some(t => t.id == d.teacher_id)) {
+                    const label = d.teacher_name ?
+                        `${d.teacher_name} [${d.teacher_reg_code || 'No Code'}] (inactive)` :
+                        'Deleted teacher (choose another)';
+                    tOpts += `<option value="${d.teacher_id}" selected>${$('<div>').text(label).html()}</option>`;
+                }
                 teachersAndSubjects.teachers.forEach(t => {
                     tOpts +=
-                        `<option value="${t.id}" ${t.id==d.teacher_id ? 'selected' :''}>${t.name} [${t.teacher_reg_code}]</option>`;
+                        `<option value="${t.id}" ${t.id==d.teacher_id ? 'selected' :''}>${t.name} [${t.teacher_reg_code || 'No Code'}]</option>`;
                 });
                 $('#edit_demo_teacher').html(tOpts);
 
@@ -1398,8 +1406,9 @@ $(document).ready(function() {
                     order.push(subject);
                 }
                 const g = map[subject];
-                if (sess.teacher_name && !g.teachers.includes(sess.teacher_name)) g.teachers.push(sess
-                    .teacher_name);
+                // WhatsApp text shows the teacher's reg. code only (never the name)
+                const teacherCode = String(sess.teacher_reg_code || '').trim();
+                if (teacherCode && !g.teachers.includes(teacherCode)) g.teachers.push(teacherCode);
                 const d = waParseDate(sess.date);
                 if (d) {
                     const day = WA_DAYS[d.getDay()];
@@ -1432,7 +1441,7 @@ $(document).ready(function() {
         lines.push(`📚 Class: ${studentClass}`);
         lines.push(`⏳ Total Scheduled Hours: ${waNum(total)}`);
         lines.push('👨‍🏫 ');
-        subjects.forEach(s => lines.push(`      ${s.name}:   ${s.teachers.join(', ')}`));
+        subjects.forEach(s => lines.push(`      ${s.name}:   ${s.teachers.length ? s.teachers.join(', ') : '-'}`));
         lines.push('', '*Days & Time*', '');
         subjects.forEach(s => {
             lines.push(`    ${s.name}`);

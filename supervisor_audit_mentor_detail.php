@@ -118,6 +118,8 @@ $mentor_name = $mentor['name'] ?? 'Unknown Mentor';
                                 <option value="">All</option>
                                 <option value="active">Active</option>
                                 <option value="ready">Ready</option>
+                                <option value="break">Break</option>
+                                <option value="inactive">Inactive</option>
                             </select>
                         </div>
                         <div class="col-6">
@@ -262,7 +264,8 @@ $(document).ready(function() {
             f_team = $('#f_team').val();
 
         // 1. Status & Fee
-        if (f_status && !row.status_badge.toLowerCase().includes(f_status)) return false;
+        // Exact match on the raw status ("inactive" contains "active", so a text search is wrong)
+        if (f_status && String(row.status || '').toLowerCase() !== f_status) return false;
         if (f_fee && !row.fee_display.includes(f_fee)) return false;
 
         // 2. Exam Status (Check icon color)

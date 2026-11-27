@@ -243,7 +243,9 @@ $(document).ready(function() {
                 "data": "email"
             },
             {
-                "data": "teacher_reg_code"
+                "data": "teacher_reg_code",
+                "render": (d, t, r) => r.teacher_id ? (d || '<span class="text-muted">Not set</span>') :
+                    '<span class="badge bg-warning text-dark" title="Open Edit and save to create the teacher profile">No profile</span>'
             }, {
                 "data": "status_badge"
             },

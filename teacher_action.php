@@ -2,6 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 require 'includes/db.php';
+require_once 'includes/teacher_usage.php';
 
 // Authorization Check: Only 'admin' can access
 if (!isset($_SESSION["loggedin"]) || $_SESSION['role'] !== 'admin') {
@@ -43,9 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             break;
 
         default: // Get list for DataTable
-            $sql = "SELECT u.id, u.name, u.email, t.teacher_reg_code, u.status 
+            // LEFT JOIN: also list teacher accounts that don't have a teacher profile yet
+            $sql = "SELECT u.id, u.name, u.email, COALESCE(t.teacher_reg_code, '') AS teacher_reg_code, u.status,
+                           t.id AS teacher_id
                     FROM users u
-                    JOIN teachers t ON u.id = t.user_id
+                    LEFT JOIN teachers t ON u.id = t.user_id
                     WHERE u.role = 'teacher' ORDER BY u.id DESC";
             $result = $conn->query($sql);
             $data = [];
@@ -153,6 +156,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $teacher_check->execute();
                 if (!$teacher_check->get_result()->fetch_assoc()) {
                     throw new Exception('Teacher account not found.');
+                }
+                $usage = teacher_usage_counts($conn, $user_id);
+                if (!empty($usage)) {
+                    throw new Exception(teacher_usage_message($usage));
                 }
                 $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
                 $stmt->bind_param("i", $user_id);

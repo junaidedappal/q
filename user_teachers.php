@@ -392,7 +392,14 @@ $(document).ready(function() {
             if (r.isConfirmed) $.post('user_teachers_action.php', {
                 action: 'delete',
                 user_id: id
-            }, () => table.ajax.reload(null, false));
+            }, function(res) {
+                if (res.status === 'success') {
+                    table.ajax.reload(null, false);
+                    Swal.fire('Deleted', 'Teacher deleted.', 'success');
+                } else {
+                    Swal.fire('Cannot delete', res.message, 'error');
+                }
+            }, 'json').fail(() => Swal.fire('Error', 'Could not delete the teacher.', 'error'));
         });
     });
 });
